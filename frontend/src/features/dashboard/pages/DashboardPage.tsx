@@ -23,7 +23,7 @@ export function DashboardPage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total de Eleitores</CardTitle>
@@ -41,6 +41,12 @@ export function DashboardPage() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Cadastrado pela Equipe</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">{data.staff_registered_count}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Veículos Adesivados</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-semibold">{data.total_vehicles}</CardContent>
             </Card>
           </div>
 

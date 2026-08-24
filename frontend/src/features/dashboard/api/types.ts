@@ -17,6 +17,7 @@ export interface DashboardStats {
   self_registered_count: number;
   staff_registered_count: number;
   leadership_breakdown: LeadershipBreakdownPoint[];
+  total_vehicles: number;
 }
 
 /** Ordem fixa das faixas etárias — o backend não garante essa ordem (vem de GROUP BY). */

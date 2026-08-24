@@ -32,6 +32,7 @@ from src.presentation.api.v1.routers import (
     leaderships,
     public_registration,
     tenant_registration,
+    vehicles,
     voters,
     whatsapp,
 )
@@ -99,5 +100,6 @@ app.include_router(whatsapp.router, prefix=settings.api_v1_prefix)
 app.include_router(tenant_registration.router, prefix=settings.api_v1_prefix)
 app.include_router(public_registration.router, prefix=settings.api_v1_prefix)
 app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
+app.include_router(vehicles.router, prefix=settings.api_v1_prefix)
 
 print(">>> [DIAGNÓSTICO] main.py carregado com sucesso, app FastAPI pronto.", flush=True)

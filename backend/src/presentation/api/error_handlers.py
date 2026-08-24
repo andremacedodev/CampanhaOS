@@ -29,6 +29,8 @@ from src.application.tenant_settings.exceptions import (
     InvalidRegistrationTokenError,
     RegistrationRateLimitExceededError,
 )
+from src.application.vehicles.exceptions import NoPhotoError, UnsupportedPhotoTypeError, VehicleNotFoundError
+from src.application.vehicles.upload_photo import VehiclePhotoTooLargeError
 from src.application.voters.exceptions import VoterNotFoundError
 from src.application.voters.public_self_register import ConsentNotGivenError
 from src.application.whatsapp.exceptions import ContactNotOptedInError, WhatsAppContactNotFoundError
@@ -62,6 +64,10 @@ _APPLICATION_ERROR_STATUS_MAP: dict[type[ApplicationError], int] = {
     # genérico.
     RegistrationRateLimitExceededError: status.HTTP_429_TOO_MANY_REQUESTS,
     ConsentNotGivenError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    VehicleNotFoundError: status.HTTP_404_NOT_FOUND,
+    NoPhotoError: status.HTTP_404_NOT_FOUND,
+    UnsupportedPhotoTypeError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    VehiclePhotoTooLargeError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 

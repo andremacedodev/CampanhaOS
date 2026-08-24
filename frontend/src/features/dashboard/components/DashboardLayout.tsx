@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { to: "/financeiro", label: "Financeiro" },
   { to: "/mapa", label: "Mapa" },
   { to: "/link-cadastro", label: "Link de Autocadastro" },
+  { to: "/veiculos", label: "Veículos Adesivados" },
 ];
 
 export function DashboardLayout() {

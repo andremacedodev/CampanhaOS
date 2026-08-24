@@ -12,6 +12,8 @@ import { LeadershipsListPage } from "@/features/leaderships/pages/LeadershipsLis
 import { MapPage } from "@/features/map/pages/MapPage";
 import { PublicRegistrationPage } from "@/features/public-registration/pages/PublicRegistrationPage";
 import { RegistrationLinkPage } from "@/features/registration-link/pages/RegistrationLinkPage";
+import { VehicleFormPage } from "@/features/vehicles/pages/VehicleFormPage";
+import { VehiclesListPage } from "@/features/vehicles/pages/VehiclesListPage";
 import { VoterFormPage } from "@/features/voters/pages/VoterFormPage";
 import { VotersListPage } from "@/features/voters/pages/VotersListPage";
 
@@ -47,6 +49,9 @@ export const router = createBrowserRouter([
           { path: "/financeiro/:id/editar", element: <FinanceTransactionFormPage /> },
           { path: "/mapa", element: <MapPage /> },
           { path: "/link-cadastro", element: <RegistrationLinkPage /> },
+          { path: "/veiculos", element: <VehiclesListPage /> },
+          { path: "/veiculos/novo", element: <VehicleFormPage /> },
+          { path: "/veiculos/:id/editar", element: <VehicleFormPage /> },
         ],
       },
     ],

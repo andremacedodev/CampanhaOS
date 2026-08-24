@@ -10,14 +10,16 @@ from src.application.dashboard.clear_voter_goal import ClearVoterGoalUseCase
 from src.application.dashboard.get_dashboard_stats import GetDashboardStatsUseCase
 from src.application.dashboard.set_voter_goal import SetVoterGoalUseCase
 from src.presentation.api.admin_dependencies import AdminTenantRepositoryDep
+from src.presentation.api.vehicles_dependencies import VehicleRepositoryDep
 from src.presentation.api.voters_dependencies import VoterRepositoryDep
 
 
 def get_dashboard_stats_use_case(
     tenant_repository: AdminTenantRepositoryDep,
     voter_repository: VoterRepositoryDep,
+    vehicle_repository: VehicleRepositoryDep,
 ) -> GetDashboardStatsUseCase:
-    return GetDashboardStatsUseCase(tenant_repository, voter_repository)
+    return GetDashboardStatsUseCase(tenant_repository, voter_repository, vehicle_repository)
 
 
 def get_set_voter_goal_use_case(tenant_repository: AdminTenantRepositoryDep) -> SetVoterGoalUseCase:
