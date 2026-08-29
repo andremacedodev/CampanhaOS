@@ -30,6 +30,7 @@ class DashboardStatsOutput:
     self_registered_count: int = 0
     staff_registered_count: int = 0
     leadership_breakdown: list[LeadershipBreakdownPoint] = field(default_factory=list)
+    total_vehicles: int = 0
 
 
 @dataclass(frozen=True)

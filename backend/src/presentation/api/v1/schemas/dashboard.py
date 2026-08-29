@@ -28,6 +28,7 @@ class DashboardStatsResponse(BaseModel):
     self_registered_count: int
     staff_registered_count: int
     leadership_breakdown: list[LeadershipBreakdownPointResponse]
+    total_vehicles: int
 
 
 class SetVoterGoalRequest(BaseModel):

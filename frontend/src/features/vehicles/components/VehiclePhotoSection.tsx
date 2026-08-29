@@ -58,14 +58,28 @@ export function VehiclePhotoSection({ vehicle }: VehiclePhotoSectionProps) {
           <div className="min-w-0">
             <p className="truncate text-sm">{vehicle.photo_filename}</p>
             {vehicle.photo_size_bytes !== null && (
-              <p className="text-xs text-muted-foreground">{formatFileSize(vehicle.photo_size_bytes)}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatFileSize(vehicle.photo_size_bytes)}
+              </p>
             )}
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={handleDownload} disabled={download.isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDownload}
+              disabled={download.isPending}
+            >
               Ver
             </Button>
-            <Button type="button" variant="destructive" size="sm" onClick={handleRemove} disabled={remove.isPending}>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleRemove}
+              disabled={remove.isPending}
+            >
               Remover
             </Button>
           </div>
@@ -80,9 +94,15 @@ export function VehiclePhotoSection({ vehicle }: VehiclePhotoSectionProps) {
             disabled={upload.isPending}
             className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:opacity-90"
           />
-          <p className="text-xs text-muted-foreground">JPEG ou PNG — até 10MB (opcional).</p>
-          {upload.isPending && <p className="text-xs text-muted-foreground">Enviando...</p>}
-          {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+          <p className="text-xs text-muted-foreground">
+            JPEG ou PNG — até 10MB (opcional).
+          </p>
+          {upload.isPending && (
+            <p className="text-xs text-muted-foreground">Enviando...</p>
+          )}
+          {uploadError && (
+            <p className="text-xs text-destructive">{uploadError}</p>
+          )}
         </div>
       )}
     </div>
