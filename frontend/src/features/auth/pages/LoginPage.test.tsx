@@ -84,4 +84,43 @@ describe("LoginPage", () => {
 
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
+
+  it("lembra o ID da campanha no localStorage após login bem-sucedido", async () => {
+    const login = vi.fn().mockResolvedValue(undefined);
+    mockedUseAuth.mockReturnValue({ user: null, isLoading: false, login, logout: vi.fn() });
+
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(screen.getByLabelText("ID da campanha"), "tenant-999");
+    await user.type(screen.getByLabelText("E-mail"), "deco@teste.dev");
+    await user.type(screen.getByLabelText("Senha"), "senha_correta");
+    await user.click(screen.getByRole("button", { name: "Entrar" }));
+
+    await screen.findByText("Dashboard");
+    expect(localStorage.getItem("campanhaos_last_tenant_id")).toBe("tenant-999");
+  });
+
+  it("preenche o campo ID da campanha automaticamente se já tiver um lembrado", () => {
+    localStorage.setItem("campanhaos_last_tenant_id", "tenant-lembrado");
+    mockedUseAuth.mockReturnValue({ user: null, isLoading: false, login: vi.fn(), logout: vi.fn() });
+
+    renderLoginPage();
+
+    expect(screen.getByLabelText("ID da campanha")).toHaveValue("tenant-lembrado");
+    expect(screen.getByText("trocar campanha")).toBeInTheDocument();
+  });
+
+  it("esquece o ID lembrado ao clicar em 'trocar campanha'", async () => {
+    localStorage.setItem("campanhaos_last_tenant_id", "tenant-lembrado");
+    mockedUseAuth.mockReturnValue({ user: null, isLoading: false, login: vi.fn(), logout: vi.fn() });
+
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.click(screen.getByText("trocar campanha"));
+
+    expect(screen.getByLabelText("ID da campanha")).toHaveValue("");
+    expect(localStorage.getItem("campanhaos_last_tenant_id")).toBeNull();
+  });
 });

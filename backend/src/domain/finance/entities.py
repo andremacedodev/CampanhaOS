@@ -1,5 +1,6 @@
 """
-Entidade de domínio: FinanceTransaction (lançamento financeiro).
+Entidades de domínio do módulo financeiro: FinanceTransaction (lançamento
+financeiro) e FinanceAttachment (documento anexado a um lançamento).
 
 RF-12 (Fase 1): receitas, despesas e doações da campanha.
 
@@ -13,6 +14,11 @@ o valor soma ou subtrai num relatório (RN implícita: receita e doação
 somam, despesa subtrai). Isso evita a ambiguidade de "valor negativo
 representando uma despesa", que é fácil de inverter por engano em algum
 cálculo futuro.
+
+FinanceAttachment é uma entidade PRÓPRIA (não campos soltos dentro de
+FinanceTransaction) — um lançamento pode ter vários documentos
+(comprovante, contrato, orçamento), até um limite de 10. Cada anexo tem
+seu próprio ciclo de vida (upload/remoção independente).
 """
 
 from dataclasses import dataclass
@@ -24,13 +30,19 @@ from src.domain.shared.exceptions import DomainError, InvalidNameError
 
 _VALID_TRANSACTION_TYPES = frozenset({"receita", "despesa", "doacao"})
 
-# Tipos de anexo aceitos — nota fiscal, cupom fiscal, comprovante. Só
-# imagem e PDF, nada de tipo executável/script — checagem de verdade
-# (conteúdo real do arquivo, não extensão) acontece na camada de
-# infraestrutura (ver infrastructure/storage/file_validator.py), aqui só
-# validamos que o content_type declarado está na lista permitida.
+# Tipos de anexo aceitos — nota fiscal, cupom fiscal, comprovante,
+# contrato, orçamento. Só imagem e PDF, nada de tipo executável/script —
+# checagem de verdade (conteúdo real do arquivo, não extensão) acontece
+# na camada de infraestrutura (ver infrastructure/storage/file_signature.py),
+# aqui só validamos que o content_type declarado está na lista permitida.
 MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 VALID_ATTACHMENT_CONTENT_TYPES = frozenset({"image/jpeg", "image/png", "application/pdf"})
+
+# Categoria é só pra organizar a visualização — não muda nenhuma regra de
+# negócio nem validação, é puramente descritivo.
+VALID_ATTACHMENT_CATEGORIES = frozenset({"comprovante", "contrato", "orcamento", "outro"})
+
+MAX_ATTACHMENTS_PER_TRANSACTION = 10
 
 
 class InvalidTransactionTypeError(DomainError):
@@ -50,6 +62,19 @@ class InvalidAttachmentError(DomainError):
         super().__init__(message)
 
 
+class InvalidAttachmentCategoryError(DomainError):
+    def __init__(self, value: str) -> None:
+        super().__init__(
+            f"Categoria de anexo '{value}' inválida. Valores aceitos: "
+            f"{', '.join(sorted(VALID_ATTACHMENT_CATEGORIES))}"
+        )
+
+
+class TooManyAttachmentsError(DomainError):
+    def __init__(self) -> None:
+        super().__init__(f"Limite de {MAX_ATTACHMENTS_PER_TRANSACTION} anexos por lançamento atingido")
+
+
 @dataclass
 class FinanceTransaction:
     id: UUID
@@ -63,14 +88,6 @@ class FinanceTransaction:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
-    # Um anexo por lançamento — não é um sistema de documentos com
-    # múltiplos arquivos/versões, é literalmente "o comprovante desse
-    # gasto". `attachment_storage_key` é o caminho no Cloudflare R2, não
-    # o arquivo em si (o arquivo mora só no R2, nunca no banco).
-    attachment_storage_key: str | None = None
-    attachment_filename: str | None = None
-    attachment_content_type: str | None = None
-    attachment_size_bytes: int | None = None
 
     @staticmethod
     def create(
@@ -156,29 +173,43 @@ class FinanceTransaction:
     def soft_delete(self) -> None:
         self.deleted_at = datetime.now(UTC)
 
-    def attach_document(
-        self,
+
+@dataclass
+class FinanceAttachment:
+    id: UUID
+    tenant_id: UUID
+    transaction_id: UUID
+    uploaded_by_user_id: UUID
+    category: str
+    storage_key: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+
+    @staticmethod
+    def create(
+        tenant_id: UUID,
+        transaction_id: UUID,
+        uploaded_by_user_id: UUID,
+        category: str,
         storage_key: str,
         filename: str,
         content_type: str,
         size_bytes: int,
-    ) -> None:
+    ) -> "FinanceAttachment":
         """
-        Registra o anexo NESTE lançamento — chamado depois que o arquivo
-        já foi enviado com sucesso pro R2 (a ordem importa: primeiro
-        sobe o arquivo, só depois grava a referência aqui; nunca o
-        contrário, senão fica uma referência apontando pra um arquivo
-        que não existe).
-
-        Anexar um novo documento SUBSTITUI o anterior (um anexo por
-        lançamento) — quem chama isso é responsável por também apagar o
-        arquivo antigo do R2 se houver um (ver
-        UploadFinanceAttachmentUseCase, camada de aplicação).
+        Chamado depois que o arquivo já foi enviado com sucesso pro R2 —
+        mesma ordem de sempre: sobe o arquivo primeiro, só depois grava a
+        referência. `existing_count_for_transaction` é checado ANTES
+        disso, na camada de aplicação (ver AddFinanceAttachmentUseCase),
+        não aqui — esta entidade não tem acesso ao repositório pra saber
+        quantos anexos já existem.
         """
+        if category not in VALID_ATTACHMENT_CATEGORIES:
+            raise InvalidAttachmentCategoryError(category)
         if content_type not in VALID_ATTACHMENT_CONTENT_TYPES:
-            raise InvalidAttachmentError(
-                f"Tipo de arquivo '{content_type}' não permitido. Aceitos: JPEG, PNG, PDF."
-            )
+            raise InvalidAttachmentError(f"Tipo de arquivo '{content_type}' não permitido. Aceitos: JPEG, PNG, PDF.")
         if size_bytes <= 0:
             raise InvalidAttachmentError("Arquivo vazio")
         if size_bytes > MAX_ATTACHMENT_SIZE_BYTES:
@@ -187,15 +218,15 @@ class FinanceTransaction:
                 f"{MAX_ATTACHMENT_SIZE_BYTES / 1024 / 1024:.0f}MB"
             )
 
-        self.attachment_storage_key = storage_key
-        self.attachment_filename = filename
-        self.attachment_content_type = content_type
-        self.attachment_size_bytes = size_bytes
-        self.updated_at = datetime.now(UTC)
-
-    def remove_attachment(self) -> None:
-        self.attachment_storage_key = None
-        self.attachment_filename = None
-        self.attachment_content_type = None
-        self.attachment_size_bytes = None
-        self.updated_at = datetime.now(UTC)
+        return FinanceAttachment(
+            id=uuid4(),
+            tenant_id=tenant_id,
+            transaction_id=transaction_id,
+            uploaded_by_user_id=uploaded_by_user_id,
+            category=category,
+            storage_key=storage_key,
+            filename=filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            uploaded_at=datetime.now(UTC),
+        )

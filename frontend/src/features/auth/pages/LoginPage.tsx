@@ -7,11 +7,17 @@ import { Label } from "@/shared/components/ui/label";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { getApiErrorMessage } from "@/shared/lib/api-client";
 
+// Só o ID da campanha (não é dado sensível tipo senha) — guardar no
+// localStorage do navegador é seguro e resolve o incômodo de ter que
+// copiar/colar o UUID toda vez que loga. Fica só neste navegador, nunca
+// é enviado pra lugar nenhum sozinho.
+const LAST_TENANT_ID_STORAGE_KEY = "campanhaos_last_tenant_id";
+
 export function LoginPage() {
   const { user, isLoading, login } = useAuth();
   const navigate = useNavigate();
 
-  const [tenantId, setTenantId] = useState("");
+  const [tenantId, setTenantId] = useState(() => localStorage.getItem(LAST_TENANT_ID_STORAGE_KEY) ?? "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +35,9 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(tenantId, email, password);
+      // Login deu certo -> lembra esse ID pra próxima vez, evita ter
+      // que copiar/colar de novo.
+      localStorage.setItem(LAST_TENANT_ID_STORAGE_KEY, tenantId);
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err));
@@ -36,6 +45,13 @@ export function LoginPage() {
       setIsSubmitting(false);
     }
   }
+
+  function handleForgetTenant() {
+    localStorage.removeItem(LAST_TENANT_ID_STORAGE_KEY);
+    setTenantId("");
+  }
+
+  const hasRememberedTenant = Boolean(tenantId);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
@@ -47,7 +63,18 @@ export function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="tenantId">ID da campanha</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="tenantId">ID da campanha</Label>
+                {hasRememberedTenant && (
+                  <button
+                    type="button"
+                    onClick={handleForgetTenant}
+                    className="text-xs text-muted-foreground underline"
+                  >
+                    trocar campanha
+                  </button>
+                )}
+              </div>
               <Input
                 id="tenantId"
                 value={tenantId}
@@ -55,13 +82,9 @@ export function LoginPage() {
                 placeholder="UUID da campanha"
                 required
               />
-              {/*
-                Limitação conhecida: pedir o tenant_id (UUID) diretamente
-                é uma UX ruim. Corrigir isso exige um endpoint novo no
-                backend (buscar campanha pelo nome) — fora do escopo
-                deste módulo de frontend. Registrado como melhoria futura
-                no documento fonte da verdade.
-              */}
+              {hasRememberedTenant && (
+                <p className="text-xs text-muted-foreground">Lembrado do último acesso neste navegador.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>

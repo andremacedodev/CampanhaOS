@@ -273,10 +273,33 @@ class FinanceTransactionModel(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(String)
     occurred_at: Mapped[date] = mapped_column(Date, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    attachment_storage_key: Mapped[str | None] = mapped_column(String(500))
-    attachment_filename: Mapped[str | None] = mapped_column(String(255))
-    attachment_content_type: Mapped[str | None] = mapped_column(String(100))
-    attachment_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class FinanceAttachmentModel(TimestampMixin, Base):
+    """Documento anexado a um lançamento financeiro — vários por lançamento, cada um com categoria."""
+
+    __tablename__ = "finance_attachments"
+    __table_args__ = (
+        Index("ix_finance_attachments_tenant_id", "tenant_id"),
+        Index("ix_finance_attachments_transaction_id", "transaction_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("finance_transactions.id", ondelete="CASCADE"), nullable=False
+    )
+    uploaded_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class PlanModel(TimestampMixin, Base):
@@ -356,3 +379,34 @@ class WhatsAppContactModel(TimestampMixin, Base):
     opted_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     opt_in_source: Mapped[str] = mapped_column(String(50), nullable=False)
     opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class StickeredVehicleModel(TimestampMixin, Base):
+    """Veículo adesivado — RLS ativo, mesmo padrão de voters/events/etc."""
+
+    __tablename__ = "stickered_vehicles"
+    __table_args__ = (
+        Index("ix_stickered_vehicles_tenant_id", "tenant_id"),
+        Index("ix_stickered_vehicles_plate", "plate"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    plate: Mapped[str] = mapped_column(String(10), nullable=False)
+    owner_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    voter_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("voters.id", ondelete="SET NULL"), nullable=True
+    )
+    model: Mapped[str | None] = mapped_column(String(100))
+    city: Mapped[str | None] = mapped_column(String(255))
+    stickered_at: Mapped[date] = mapped_column(Date, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    photo_storage_key: Mapped[str | None] = mapped_column(String(500))
+    photo_filename: Mapped[str | None] = mapped_column(String(255))
+    photo_content_type: Mapped[str | None] = mapped_column(String(100))
+    photo_size_bytes: Mapped[int | None] = mapped_column(BigInteger)

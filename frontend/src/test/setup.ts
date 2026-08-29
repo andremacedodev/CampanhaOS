@@ -9,7 +9,11 @@ import { afterEach } from "vitest";
 
 // Desmonta os componentes renderizados entre um teste e outro — sem
 // isso, o DOM de um teste "vazaria" para o próximo, causando falhas
-// difíceis de depurar (ex: encontrar um elemento duplicado).
+// difíceis de depurar (ex: encontrar um elemento duplicado). Também
+// limpa o localStorage — sem isso, um teste que grava algo lá (ex:
+// login bem-sucedido lembrando o ID da campanha) vazaria pro próximo
+// teste do mesmo arquivo.
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });
