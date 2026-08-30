@@ -11,12 +11,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
+from src.application.finance.add_attachment import AddFinanceAttachmentInput, AddFinanceAttachmentUseCase
 from src.application.finance.create_transaction import CreateFinanceTransactionUseCase
 from src.application.finance.delete_transaction import DeleteFinanceTransactionUseCase
 from src.application.finance.dto import (
     CreateFinanceTransactionInput,
     DeleteFinanceTransactionInput,
     GetFinanceTransactionInput,
+    ListFinanceAttachmentsInput,
     ListFinanceTransactionsInput,
     UpdateFinanceTransactionInput,
 )
@@ -25,23 +27,27 @@ from src.application.finance.get_attachment_download_url import (
     GetFinanceAttachmentDownloadUrlUseCase,
 )
 from src.application.finance.get_transaction import GetFinanceTransactionUseCase
+from src.application.finance.list_attachments import ListFinanceAttachmentsUseCase
 from src.application.finance.list_transactions import ListFinanceTransactionsUseCase
 from src.application.finance.remove_attachment import RemoveFinanceAttachmentInput, RemoveFinanceAttachmentUseCase
 from src.application.finance.update_transaction import UpdateFinanceTransactionUseCase
-from src.application.finance.upload_attachment import UploadFinanceAttachmentInput, UploadFinanceAttachmentUseCase
 from src.presentation.api.dependencies import CurrentUser, DbSession
 from src.presentation.api.finance_dependencies import (
+    get_add_finance_attachment_use_case,
     get_create_finance_transaction_use_case,
     get_delete_finance_transaction_use_case,
     get_finance_attachment_download_url_use_case,
     get_get_finance_transaction_use_case,
+    get_list_finance_attachments_use_case,
     get_list_finance_transactions_use_case,
     get_remove_finance_attachment_use_case,
     get_update_finance_transaction_use_case,
-    get_upload_finance_attachment_use_case,
 )
 from src.presentation.api.v1.schemas.finance import (
+    AttachmentCategory,
     FinanceAttachmentDownloadResponse,
+    FinanceAttachmentListResponse,
+    FinanceAttachmentResponse,
     FinanceTransactionCreateRequest,
     FinanceTransactionListResponse,
     FinanceTransactionResponse,
@@ -146,62 +152,72 @@ async def delete_transaction(
     await session.commit()
 
 
-@router.post("/{transaction_id}/attachment", response_model=FinanceTransactionResponse)
-async def upload_attachment(
+@router.post("/{transaction_id}/attachments", response_model=FinanceAttachmentResponse, status_code=status.HTTP_201_CREATED)
+async def add_attachment(
     transaction_id: UUID,
     current_user: CurrentUser,
     session: DbSession,
-    use_case: Annotated[UploadFinanceAttachmentUseCase, Depends(get_upload_finance_attachment_use_case)],
-    get_use_case: Annotated[GetFinanceTransactionUseCase, Depends(get_get_finance_transaction_use_case)],
+    use_case: Annotated[AddFinanceAttachmentUseCase, Depends(get_add_finance_attachment_use_case)],
+    category: AttachmentCategory = Query(...),
     file: UploadFile = File(...),
-) -> FinanceTransactionResponse:
+) -> FinanceAttachmentResponse:
     file_bytes = await file.read()
-    await use_case.execute(
-        UploadFinanceAttachmentInput(
+    output = await use_case.execute(
+        AddFinanceAttachmentInput(
             tenant_id=current_user.tenant_id,
             transaction_id=transaction_id,
+            uploaded_by_user_id=current_user.id,
+            category=category,
             filename=file.filename or "arquivo",
             file_bytes=file_bytes,
         )
     )
-    # IMPORTANTE: busca de novo ANTES do commit, não depois. O contexto de
-    # tenant do RLS (`set_config(..., is_local=true)`) tem escopo de
-    # TRANSAÇÃO — é descartado automaticamente no commit. Se buscássemos
-    # depois de comitar, essa segunda consulta rodaria sem contexto de
-    # tenant nenhum, e o RLS bloquearia tudo (retornando vazio, que o
-    # código interpretaria erroneamente como "não encontrado"). Buscar
-    # ANTES do commit funciona porque a mesma transação já enxerga as
-    # próprias mudanças (não precisa ter comitado ainda pra "ver a si
-    # mesma").
-    output = await get_use_case.execute(
-        GetFinanceTransactionInput(tenant_id=current_user.tenant_id, transaction_id=transaction_id)
-    )
     await session.commit()
-    return FinanceTransactionResponse.model_validate(output)
+    return FinanceAttachmentResponse.model_validate(output)
 
 
-@router.delete("/{transaction_id}/attachment", status_code=status.HTTP_204_NO_CONTENT)
+@router.get("/{transaction_id}/attachments", response_model=FinanceAttachmentListResponse)
+async def list_attachments(
+    transaction_id: UUID,
+    current_user: CurrentUser,
+    use_case: Annotated[ListFinanceAttachmentsUseCase, Depends(get_list_finance_attachments_use_case)],
+) -> FinanceAttachmentListResponse:
+    items = await use_case.execute(
+        ListFinanceAttachmentsInput(tenant_id=current_user.tenant_id, transaction_id=transaction_id)
+    )
+    return FinanceAttachmentListResponse(items=[FinanceAttachmentResponse.model_validate(i) for i in items])
+
+
+@router.delete("/{transaction_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_attachment(
     transaction_id: UUID,
+    attachment_id: UUID,
     current_user: CurrentUser,
     session: DbSession,
     use_case: Annotated[RemoveFinanceAttachmentUseCase, Depends(get_remove_finance_attachment_use_case)],
 ) -> None:
     await use_case.execute(
-        RemoveFinanceAttachmentInput(tenant_id=current_user.tenant_id, transaction_id=transaction_id)
+        RemoveFinanceAttachmentInput(
+            tenant_id=current_user.tenant_id, transaction_id=transaction_id, attachment_id=attachment_id
+        )
     )
     await session.commit()
 
 
-@router.get("/{transaction_id}/attachment/download-url", response_model=FinanceAttachmentDownloadResponse)
+@router.get(
+    "/{transaction_id}/attachments/{attachment_id}/download-url", response_model=FinanceAttachmentDownloadResponse
+)
 async def get_attachment_download_url(
     transaction_id: UUID,
+    attachment_id: UUID,
     current_user: CurrentUser,
     use_case: Annotated[
         GetFinanceAttachmentDownloadUrlUseCase, Depends(get_finance_attachment_download_url_use_case)
     ],
 ) -> FinanceAttachmentDownloadResponse:
     output = await use_case.execute(
-        GetFinanceAttachmentDownloadUrlInput(tenant_id=current_user.tenant_id, transaction_id=transaction_id)
+        GetFinanceAttachmentDownloadUrlInput(
+            tenant_id=current_user.tenant_id, transaction_id=transaction_id, attachment_id=attachment_id
+        )
     )
     return FinanceAttachmentDownloadResponse(download_url=output.download_url, filename=output.filename)

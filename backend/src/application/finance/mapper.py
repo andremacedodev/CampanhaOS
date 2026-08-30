@@ -1,5 +1,5 @@
-from src.application.finance.dto import FinanceSummaryOutput, FinanceTransactionOutput
-from src.domain.finance.entities import FinanceTransaction
+from src.application.finance.dto import FinanceAttachmentOutput, FinanceSummaryOutput, FinanceTransactionOutput
+from src.domain.finance.entities import FinanceAttachment, FinanceTransaction
 from src.domain.finance.repository import FinanceSummary
 
 
@@ -14,9 +14,18 @@ def transaction_to_output(transaction: FinanceTransaction) -> FinanceTransaction
         occurred_at=transaction.occurred_at,
         created_at=transaction.created_at,
         updated_at=transaction.updated_at,
-        attachment_filename=transaction.attachment_filename,
-        attachment_content_type=transaction.attachment_content_type,
-        attachment_size_bytes=transaction.attachment_size_bytes,
+    )
+
+
+def attachment_to_output(attachment: FinanceAttachment) -> FinanceAttachmentOutput:
+    return FinanceAttachmentOutput(
+        id=attachment.id,
+        transaction_id=attachment.transaction_id,
+        category=attachment.category,
+        filename=attachment.filename,
+        content_type=attachment.content_type,
+        size_bytes=attachment.size_bytes,
+        uploaded_at=attachment.uploaded_at,
     )
 
 

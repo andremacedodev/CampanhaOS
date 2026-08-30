@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addFinanceAttachment,
   createFinanceTransaction,
   deleteFinanceTransaction,
   getFinanceAttachmentDownloadUrl,
   getFinanceTransaction,
+  listFinanceAttachments,
   listFinanceTransactions,
   removeFinanceAttachment,
   updateFinanceTransaction,
-  uploadFinanceAttachment,
 } from "@/features/finance/api/finance-api";
 import type {
   FinanceTransactionCreateRequest,
@@ -62,12 +63,22 @@ export function useDeleteFinanceTransaction() {
   });
 }
 
-export function useUploadFinanceAttachment(transactionId: string) {
+const FINANCE_ATTACHMENTS_QUERY_KEY = "finance-attachments";
+
+export function useFinanceAttachments(transactionId: string) {
+  return useQuery({
+    queryKey: [FINANCE_ATTACHMENTS_QUERY_KEY, transactionId],
+    queryFn: () => listFinanceAttachments(transactionId),
+  });
+}
+
+export function useAddFinanceAttachment(transactionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => uploadFinanceAttachment(transactionId, file),
+    mutationFn: ({ category, file }: { category: string; file: File }) =>
+      addFinanceAttachment(transactionId, category, file),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [FINANCE_QUERY_KEY] });
+      void queryClient.invalidateQueries({ queryKey: [FINANCE_ATTACHMENTS_QUERY_KEY, transactionId] });
     },
   });
 }
@@ -75,9 +86,9 @@ export function useUploadFinanceAttachment(transactionId: string) {
 export function useRemoveFinanceAttachment(transactionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => removeFinanceAttachment(transactionId),
+    mutationFn: (attachmentId: string) => removeFinanceAttachment(transactionId, attachmentId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [FINANCE_QUERY_KEY] });
+      void queryClient.invalidateQueries({ queryKey: [FINANCE_ATTACHMENTS_QUERY_KEY, transactionId] });
     },
   });
 }
@@ -88,8 +99,8 @@ export function useRemoveFinanceAttachment(transactionId: string) {
  * cachear um link que pode já estar vencido) é o comportamento certo
  * aqui.
  */
-export function useDownloadFinanceAttachment() {
+export function useDownloadFinanceAttachment(transactionId: string) {
   return useMutation({
-    mutationFn: (transactionId: string) => getFinanceAttachmentDownloadUrl(transactionId),
+    mutationFn: (attachmentId: string) => getFinanceAttachmentDownloadUrl(transactionId, attachmentId),
   });
 }

@@ -17,6 +17,15 @@ export const TRANSACTION_TYPE_OPTIONS = [
   { value: "doacao", label: "Doação" },
 ] as const;
 
+export const ATTACHMENT_CATEGORY_OPTIONS = [
+  { value: "comprovante", label: "Comprovante" },
+  { value: "contrato", label: "Contrato" },
+  { value: "orcamento", label: "Orçamento" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+export const MAX_ATTACHMENTS_PER_TRANSACTION = 10;
+
 export interface FinanceTransaction {
   id: string;
   created_by_user_id: string;
@@ -27,9 +36,20 @@ export interface FinanceTransaction {
   occurred_at: string;
   created_at: string;
   updated_at: string;
-  attachment_filename: string | null;
-  attachment_content_type: string | null;
-  attachment_size_bytes: number | null;
+}
+
+export interface FinanceAttachment {
+  id: string;
+  transaction_id: string;
+  category: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+}
+
+export interface FinanceAttachmentListResponse {
+  items: FinanceAttachment[];
 }
 
 export interface FinanceAttachmentDownloadResponse {

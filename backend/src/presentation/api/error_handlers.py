@@ -22,7 +22,8 @@ from src.application.auth.exceptions import (
 )
 from src.application.billing.exceptions import InactivePlanError, PlanNotFoundError
 from src.application.events.exceptions import EventNotFoundError, ResponsibleUserNotFoundError
-from src.application.finance.exceptions import FinanceTransactionNotFoundError
+from src.application.finance.add_attachment import AttachmentTooLargeError, TooManyAttachmentsError
+from src.application.finance.exceptions import FinanceAttachmentNotFoundError, FinanceTransactionNotFoundError
 from src.application.leaderships.exceptions import LeadershipNotFoundError
 from src.application.shared.exceptions import ApplicationError
 from src.application.tenant_settings.exceptions import (
@@ -49,6 +50,9 @@ _APPLICATION_ERROR_STATUS_MAP: dict[type[ApplicationError], int] = {
     EventNotFoundError: status.HTTP_404_NOT_FOUND,
     ResponsibleUserNotFoundError: status.HTTP_404_NOT_FOUND,
     FinanceTransactionNotFoundError: status.HTTP_404_NOT_FOUND,
+    FinanceAttachmentNotFoundError: status.HTTP_404_NOT_FOUND,
+    TooManyAttachmentsError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    AttachmentTooLargeError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidAdminCredentialsError: status.HTTP_401_UNAUTHORIZED,
     AdminTenantNotFoundError: status.HTTP_404_NOT_FOUND,
     PlanNotFoundError: status.HTTP_404_NOT_FOUND,

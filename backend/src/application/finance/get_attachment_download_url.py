@@ -1,39 +1,20 @@
-from dataclasses import dataclass
-from uuid import UUID
-
-from src.application.finance.exceptions import FinanceTransactionNotFoundError, NoAttachmentError
+from src.application.finance.dto import GetFinanceAttachmentDownloadUrlInput, GetFinanceAttachmentDownloadUrlOutput
+from src.application.finance.exceptions import FinanceAttachmentNotFoundError
 from src.application.shared.file_storage_port import FileStoragePort
-from src.domain.finance.repository import FinanceRepository
-
-
-@dataclass(frozen=True)
-class GetFinanceAttachmentDownloadUrlInput:
-    tenant_id: UUID
-    transaction_id: UUID
-
-
-@dataclass(frozen=True)
-class GetFinanceAttachmentDownloadUrlOutput:
-    download_url: str
-    filename: str
+from src.domain.finance.attachment_repository import FinanceAttachmentRepository
 
 
 class GetFinanceAttachmentDownloadUrlUseCase:
-    def __init__(self, finance_repository: FinanceRepository, file_storage: FileStoragePort) -> None:
-        self._finance_repository = finance_repository
+    def __init__(self, attachment_repository: FinanceAttachmentRepository, file_storage: FileStoragePort) -> None:
+        self._attachment_repository = attachment_repository
         self._file_storage = file_storage
 
     async def execute(
         self, input_data: GetFinanceAttachmentDownloadUrlInput
     ) -> GetFinanceAttachmentDownloadUrlOutput:
-        transaction = await self._finance_repository.find_by_id(input_data.tenant_id, input_data.transaction_id)
-        if transaction is None or transaction.is_deleted:
-            raise FinanceTransactionNotFoundError
+        attachment = await self._attachment_repository.find_by_id(input_data.tenant_id, input_data.attachment_id)
+        if attachment is None or attachment.transaction_id != input_data.transaction_id:
+            raise FinanceAttachmentNotFoundError
 
-        if transaction.attachment_storage_key is None or transaction.attachment_filename is None:
-            raise NoAttachmentError
-
-        download_url = await self._file_storage.generate_download_url(transaction.attachment_storage_key)
-        return GetFinanceAttachmentDownloadUrlOutput(
-            download_url=download_url, filename=transaction.attachment_filename
-        )
+        download_url = await self._file_storage.generate_download_url(attachment.storage_key)
+        return GetFinanceAttachmentDownloadUrlOutput(download_url=download_url, filename=attachment.filename)

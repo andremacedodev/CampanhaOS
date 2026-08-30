@@ -60,14 +60,6 @@ class FinanceTransactionOutput:
     occurred_at: date
     created_at: datetime
     updated_at: datetime
-    # Deliberadamente SEM `attachment_storage_key` aqui — é um caminho
-    # interno de armazenamento, nada de útil pro frontend, e não deveria
-    # nunca vazar numa resposta de API. O frontend só precisa saber SE
-    # tem anexo (e o nome/tipo/tamanho pra exibir), o link de download de
-    # verdade é gerado sob demanda (ver GetFinanceAttachmentDownloadUrlUseCase).
-    attachment_filename: str | None = None
-    attachment_content_type: str | None = None
-    attachment_size_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -86,3 +78,50 @@ class ListFinanceTransactionsOutput:
     page_size: int
     total_pages: int
     summary: FinanceSummaryOutput
+
+
+@dataclass(frozen=True)
+class AddFinanceAttachmentInput:
+    tenant_id: UUID
+    transaction_id: UUID
+    uploaded_by_user_id: UUID
+    category: str
+    filename: str
+    file_bytes: bytes
+
+
+@dataclass(frozen=True)
+class RemoveFinanceAttachmentInput:
+    tenant_id: UUID
+    transaction_id: UUID
+    attachment_id: UUID
+
+
+@dataclass(frozen=True)
+class ListFinanceAttachmentsInput:
+    tenant_id: UUID
+    transaction_id: UUID
+
+
+@dataclass(frozen=True)
+class FinanceAttachmentOutput:
+    id: UUID
+    transaction_id: UUID
+    category: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+
+
+@dataclass(frozen=True)
+class GetFinanceAttachmentDownloadUrlInput:
+    tenant_id: UUID
+    transaction_id: UUID
+    attachment_id: UUID
+
+
+@dataclass(frozen=True)
+class GetFinanceAttachmentDownloadUrlOutput:
+    download_url: str
+    filename: str

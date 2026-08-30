@@ -1,5 +1,5 @@
 """
-Schemas Pydantic dos endpoints financeiros (Financeiro básico).
+Schemas Pydantic dos endpoints financeiros (Financeiro básico + anexos múltiplos).
 """
 
 from datetime import date, datetime
@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 TransactionType = Literal["receita", "despesa", "doacao"]
+AttachmentCategory = Literal["comprovante", "contrato", "orcamento", "outro"]
 
 
 class FinanceTransactionCreateRequest(BaseModel):
@@ -40,14 +41,6 @@ class FinanceTransactionResponse(BaseModel):
     occurred_at: date
     created_at: datetime
     updated_at: datetime
-    attachment_filename: str | None
-    attachment_content_type: str | None
-    attachment_size_bytes: int | None
-
-
-class FinanceAttachmentDownloadResponse(BaseModel):
-    download_url: str
-    filename: str
 
 
 class FinanceSummaryResponse(BaseModel):
@@ -68,3 +61,24 @@ class FinanceTransactionListResponse(BaseModel):
     page_size: int
     total_pages: int
     summary: FinanceSummaryResponse
+
+
+class FinanceAttachmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    transaction_id: UUID
+    category: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_at: datetime
+
+
+class FinanceAttachmentListResponse(BaseModel):
+    items: list[FinanceAttachmentResponse]
+
+
+class FinanceAttachmentDownloadResponse(BaseModel):
+    download_url: str
+    filename: str

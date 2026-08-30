@@ -6,16 +6,20 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from src.application.finance.add_attachment import AddFinanceAttachmentUseCase
 from src.application.finance.create_transaction import CreateFinanceTransactionUseCase
 from src.application.finance.delete_transaction import DeleteFinanceTransactionUseCase
 from src.application.finance.get_attachment_download_url import GetFinanceAttachmentDownloadUrlUseCase
 from src.application.finance.get_transaction import GetFinanceTransactionUseCase
+from src.application.finance.list_attachments import ListFinanceAttachmentsUseCase
 from src.application.finance.list_transactions import ListFinanceTransactionsUseCase
 from src.application.finance.remove_attachment import RemoveFinanceAttachmentUseCase
 from src.application.finance.update_transaction import UpdateFinanceTransactionUseCase
-from src.application.finance.upload_attachment import UploadFinanceAttachmentUseCase
 from src.application.shared.file_storage_port import FileStoragePort
 from src.config.settings import Settings, get_settings
+from src.infrastructure.database.repositories.finance_attachment_repository import (
+    SqlAlchemyFinanceAttachmentRepository,
+)
 from src.infrastructure.database.repositories.finance_repository import SqlAlchemyFinanceRepository
 from src.infrastructure.storage.cloudflare_r2_storage import CloudflareR2Storage
 from src.presentation.api.dependencies import DbSession
@@ -23,6 +27,10 @@ from src.presentation.api.dependencies import DbSession
 
 def get_finance_repository(session: DbSession) -> SqlAlchemyFinanceRepository:
     return SqlAlchemyFinanceRepository(session)
+
+
+def get_finance_attachment_repository(session: DbSession) -> SqlAlchemyFinanceAttachmentRepository:
+    return SqlAlchemyFinanceAttachmentRepository(session)
 
 
 def get_file_storage(settings: Annotated[Settings, Depends(get_settings)]) -> FileStoragePort:
@@ -39,6 +47,9 @@ def get_file_storage(settings: Annotated[Settings, Depends(get_settings)]) -> Fi
 
 
 FinanceRepositoryDep = Annotated[SqlAlchemyFinanceRepository, Depends(get_finance_repository)]
+FinanceAttachmentRepositoryDep = Annotated[
+    SqlAlchemyFinanceAttachmentRepository, Depends(get_finance_attachment_repository)
+]
 FileStorageDep = Annotated[FileStoragePort, Depends(get_file_storage)]
 
 
@@ -72,22 +83,30 @@ def get_delete_finance_transaction_use_case(
     return DeleteFinanceTransactionUseCase(finance_repository)
 
 
-def get_upload_finance_attachment_use_case(
+def get_add_finance_attachment_use_case(
     finance_repository: FinanceRepositoryDep,
+    attachment_repository: FinanceAttachmentRepositoryDep,
     file_storage: FileStorageDep,
-) -> UploadFinanceAttachmentUseCase:
-    return UploadFinanceAttachmentUseCase(finance_repository, file_storage)
+) -> AddFinanceAttachmentUseCase:
+    return AddFinanceAttachmentUseCase(finance_repository, attachment_repository, file_storage)
+
+
+def get_list_finance_attachments_use_case(
+    finance_repository: FinanceRepositoryDep,
+    attachment_repository: FinanceAttachmentRepositoryDep,
+) -> ListFinanceAttachmentsUseCase:
+    return ListFinanceAttachmentsUseCase(finance_repository, attachment_repository)
 
 
 def get_remove_finance_attachment_use_case(
-    finance_repository: FinanceRepositoryDep,
+    attachment_repository: FinanceAttachmentRepositoryDep,
     file_storage: FileStorageDep,
 ) -> RemoveFinanceAttachmentUseCase:
-    return RemoveFinanceAttachmentUseCase(finance_repository, file_storage)
+    return RemoveFinanceAttachmentUseCase(attachment_repository, file_storage)
 
 
 def get_finance_attachment_download_url_use_case(
-    finance_repository: FinanceRepositoryDep,
+    attachment_repository: FinanceAttachmentRepositoryDep,
     file_storage: FileStorageDep,
 ) -> GetFinanceAttachmentDownloadUrlUseCase:
-    return GetFinanceAttachmentDownloadUrlUseCase(finance_repository, file_storage)
+    return GetFinanceAttachmentDownloadUrlUseCase(attachment_repository, file_storage)

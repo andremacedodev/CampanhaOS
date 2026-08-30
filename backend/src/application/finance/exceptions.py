@@ -6,9 +6,9 @@ class FinanceTransactionNotFoundError(ApplicationError):
         super().__init__("Lançamento financeiro não encontrado")
 
 
-class NoAttachmentError(ApplicationError):
+class FinanceAttachmentNotFoundError(ApplicationError):
     def __init__(self) -> None:
-        super().__init__("Este lançamento não tem nenhum anexo")
+        super().__init__("Anexo não encontrado")
 
 
 class UnsupportedFileTypeError(ApplicationError):

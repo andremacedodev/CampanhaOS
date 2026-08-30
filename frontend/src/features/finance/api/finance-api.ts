@@ -1,6 +1,8 @@
 import { apiClient } from "@/shared/lib/api-client";
 import type {
+  FinanceAttachment,
   FinanceAttachmentDownloadResponse,
+  FinanceAttachmentListResponse,
   FinanceTransaction,
   FinanceTransactionCreateRequest,
   FinanceTransactionListParams,
@@ -37,20 +39,36 @@ export async function deleteFinanceTransaction(id: string): Promise<void> {
   await apiClient.delete(`/finance/${id}`);
 }
 
-export async function uploadFinanceAttachment(id: string, file: File): Promise<FinanceTransaction> {
+export async function addFinanceAttachment(
+  transactionId: string,
+  category: string,
+  file: File,
+): Promise<FinanceAttachment> {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await apiClient.post<FinanceTransaction>(`/finance/${id}/attachment`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await apiClient.post<FinanceAttachment>(
+    `/finance/${transactionId}/attachments`,
+    formData,
+    { params: { category }, headers: { "Content-Type": "multipart/form-data" } },
+  );
   return response.data;
 }
 
-export async function removeFinanceAttachment(id: string): Promise<void> {
-  await apiClient.delete(`/finance/${id}/attachment`);
+export async function listFinanceAttachments(transactionId: string): Promise<FinanceAttachmentListResponse> {
+  const response = await apiClient.get<FinanceAttachmentListResponse>(`/finance/${transactionId}/attachments`);
+  return response.data;
 }
 
-export async function getFinanceAttachmentDownloadUrl(id: string): Promise<FinanceAttachmentDownloadResponse> {
-  const response = await apiClient.get<FinanceAttachmentDownloadResponse>(`/finance/${id}/attachment/download-url`);
+export async function removeFinanceAttachment(transactionId: string, attachmentId: string): Promise<void> {
+  await apiClient.delete(`/finance/${transactionId}/attachments/${attachmentId}`);
+}
+
+export async function getFinanceAttachmentDownloadUrl(
+  transactionId: string,
+  attachmentId: string,
+): Promise<FinanceAttachmentDownloadResponse> {
+  const response = await apiClient.get<FinanceAttachmentDownloadResponse>(
+    `/finance/${transactionId}/attachments/${attachmentId}/download-url`,
+  );
   return response.data;
 }
