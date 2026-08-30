@@ -275,8 +275,14 @@ class FinanceTransactionModel(TimestampMixin, Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class FinanceAttachmentModel(TimestampMixin, Base):
-    """Documento anexado a um lançamento financeiro — vários por lançamento, cada um com categoria."""
+class FinanceAttachmentModel(Base):
+    """
+    Documento anexado a um lançamento financeiro — vários por lançamento,
+    cada um com categoria. Deliberadamente SEM TimestampMixin — essa
+    tabela tem só `uploaded_at` (um anexo não é "atualizado", só criado
+    ou removido), não `created_at`/`updated_at` como a maioria das
+    outras tabelas do sistema.
+    """
 
     __tablename__ = "finance_attachments"
     __table_args__ = (
