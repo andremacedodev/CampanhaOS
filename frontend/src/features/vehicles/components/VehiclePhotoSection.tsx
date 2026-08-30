@@ -35,7 +35,9 @@ export function VehiclePhotoSection({ vehicle }: VehiclePhotoSectionProps) {
   }
 
   async function handleDownload() {
-    const newTab = window.open("", "_blank", "noopener,noreferrer");
+    // SEM "noopener" aqui de propósito — ver comentário detalhado no
+    // mesmo padrão em FinanceAttachmentSection.tsx.
+    const newTab = window.open("", "_blank");
     const result = await download.mutateAsync(vehicle.id);
     if (newTab) {
       newTab.location.href = result.download_url;

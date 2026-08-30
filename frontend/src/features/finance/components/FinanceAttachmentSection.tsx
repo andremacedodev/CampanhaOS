@@ -55,7 +55,15 @@ export function FinanceAttachmentSection({ transaction }: FinanceAttachmentSecti
     // Abre a aba ANTES de esperar a URL — precisa ser síncrono, dentro
     // do próprio clique, senão navegadores de celular tratam como
     // pop-up bloqueado e não abrem nada.
-    const newTab = window.open("", "_blank", "noopener,noreferrer");
+    // SEM "noopener" aqui de propósito — com noopener, vários
+    // navegadores devolvem null como referência da aba nova (é assim
+    // que noopener funciona: impede a aba nova de referenciar de volta
+    // a nossa página). Sem a referência, a gente não consegue navegar
+    // essa aba pra URL real depois, e cai no fallback que navega a
+    // aba ATUAL — exatamente o bug que "fechava" o sistema. Como a URL
+    // final é sempre a nossa (R2 assinado), não tem risco de segurança
+    // em manter a referência aqui.
+    const newTab = window.open("", "_blank");
     const result = await download.mutateAsync(attachmentId);
     if (newTab) {
       newTab.location.href = result.download_url;
