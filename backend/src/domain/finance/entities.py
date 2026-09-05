@@ -44,6 +44,13 @@ VALID_ATTACHMENT_CATEGORIES = frozenset({"comprovante", "contrato", "orcamento",
 
 MAX_ATTACHMENTS_PER_TRANSACTION = 10
 
+# Só 2 estados são ARMAZENADOS — "atrasado" nunca é gravado no banco, é
+# sempre CALCULADO na hora de exibir (pendente + data já passada = mostra
+# como atrasado). Guardar "atrasado" de verdade exigiria um job rodando
+# todo dia só pra atualizar status conforme o tempo passa — desnecessário
+# quando dá pra calcular isso a qualquer momento a partir da data.
+VALID_PAYMENT_STATUSES = frozenset({"pago", "pendente"})
+
 
 class InvalidTransactionTypeError(DomainError):
     def __init__(self, value: str) -> None:
@@ -55,6 +62,13 @@ class InvalidTransactionTypeError(DomainError):
 class InvalidAmountError(DomainError):
     def __init__(self) -> None:
         super().__init__("O valor do lançamento precisa ser maior que zero")
+
+
+class InvalidPaymentStatusError(DomainError):
+    def __init__(self, value: str) -> None:
+        super().__init__(
+            f"Status de pagamento '{value}' inválido. Valores aceitos: {', '.join(sorted(VALID_PAYMENT_STATUSES))}"
+        )
 
 
 class InvalidAttachmentError(DomainError):
@@ -88,6 +102,11 @@ class FinanceTransaction:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
+    # Default "pago" — lançamentos criados sem informar nada continuam
+    # representando o comportamento de antes dessa funcionalidade
+    # existir (a maioria já estava paga; quem cadastra escolhe
+    # "pendente" só quando for o caso).
+    payment_status: str = "pago"
 
     @staticmethod
     def create(
@@ -98,10 +117,12 @@ class FinanceTransaction:
         amount: Decimal,
         occurred_at: date,
         description: str | None = None,
+        payment_status: str = "pago",
     ) -> "FinanceTransaction":
         FinanceTransaction._validate_type(type)
         FinanceTransaction._validate_category(category)
         FinanceTransaction._validate_amount(amount)
+        FinanceTransaction._validate_payment_status(payment_status)
 
         now = datetime.now(UTC)
         return FinanceTransaction(
@@ -116,6 +137,7 @@ class FinanceTransaction:
             created_at=now,
             updated_at=now,
             deleted_at=None,
+            payment_status=payment_status,
         )
 
     @staticmethod
@@ -133,6 +155,11 @@ class FinanceTransaction:
         if amount <= 0:
             raise InvalidAmountError
 
+    @staticmethod
+    def _validate_payment_status(payment_status: str) -> None:
+        if payment_status not in VALID_PAYMENT_STATUSES:
+            raise InvalidPaymentStatusError(payment_status)
+
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
@@ -145,6 +172,18 @@ class FinanceTransaction:
         """
         return -self.amount if self.type == "despesa" else self.amount
 
+    def effective_payment_status(self, today: date) -> str:
+        """
+        Status "de exibição" — igual a `payment_status`, exceto quando
+        está "pendente" E a data do lançamento já passou, caso em que
+        vira "atrasado". Nunca gravado no banco, sempre calculado com a
+        data atual passada por quem chama (facilita teste — sem isso,
+        um teste escrito hoje quebraria sozinho amanhã).
+        """
+        if self.payment_status == "pendente" and self.occurred_at < today:
+            return "atrasado"
+        return self.payment_status
+
     def update_details(
         self,
         *,
@@ -153,6 +192,7 @@ class FinanceTransaction:
         amount: Decimal | None = None,
         description: str | None = None,
         occurred_at: date | None = None,
+        payment_status: str | None = None,
     ) -> None:
         if type is not None:
             FinanceTransaction._validate_type(type)
@@ -167,6 +207,9 @@ class FinanceTransaction:
             self.description = description or None
         if occurred_at is not None:
             self.occurred_at = occurred_at
+        if payment_status is not None:
+            FinanceTransaction._validate_payment_status(payment_status)
+            self.payment_status = payment_status
 
         self.updated_at = datetime.now(UTC)
 

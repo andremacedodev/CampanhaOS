@@ -12,7 +12,11 @@ import {
   TableRow,
 } from "@/shared/components/ui/table";
 import { useDeleteFinanceTransaction, useFinanceTransactions } from "@/features/finance/hooks/use-finance";
-import { TRANSACTION_TYPE_OPTIONS, formatCurrencyFromString } from "@/features/finance/api/types";
+import {
+  PAYMENT_STATUS_DISPLAY,
+  TRANSACTION_TYPE_OPTIONS,
+  formatCurrencyFromString,
+} from "@/features/finance/api/types";
 
 const PAGE_SIZE = 20;
 
@@ -35,10 +39,12 @@ function formatDate(iso: string): string {
 
 export function FinanceTransactionsListPage() {
   const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError } = useFinanceTransactions({
     type: typeFilter || undefined,
+    payment_status: statusFilter || undefined,
     page,
     page_size: PAGE_SIZE,
   });
@@ -106,21 +112,39 @@ export function FinanceTransactionsListPage() {
         </div>
       )}
 
-      <Select
-        value={typeFilter}
-        onChange={(e) => {
-          setTypeFilter(e.target.value);
-          setPage(1);
-        }}
-        className="max-w-xs"
-      >
-        <option value="">Todos os tipos</option>
-        {TRANSACTION_TYPE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Select
+          value={typeFilter}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            setPage(1);
+          }}
+          className="max-w-xs"
+        >
+          <option value="">Todos os tipos</option>
+          {TRANSACTION_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          className="max-w-xs"
+        >
+          <option value="">Todos os status</option>
+          <option value="pago">Pago</option>
+          {/* Enviar "pendente" pro backend já traz junto o que está
+              "atrasado" (é um subconjunto de pendente) — a distinção
+              visual entre os dois aparece no badge de cada linha. */}
+          <option value="pendente">Pendente / Atrasado</option>
+        </Select>
+      </div>
 
       {isLoading && <p className="text-muted-foreground">Carregando...</p>}
       {isError && <p className="text-destructive">Não foi possível carregar os lançamentos.</p>}
@@ -134,38 +158,52 @@ export function FinanceTransactionsListPage() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Anexos</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Nenhum lançamento encontrado.
                   </TableCell>
                 </TableRow>
               )}
-              {data.items.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>{formatDate(transaction.occurred_at)}</TableCell>
-                  <TableCell className="capitalize">{transaction.type}</TableCell>
-                  <TableCell className="font-medium">{transaction.category}</TableCell>
-                  <TableCell className="text-right">{formatCurrencyFromString(transaction.amount)}</TableCell>
-                  <TableCell className="space-x-2 text-right">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/financeiro/${transaction.id}/editar`}>Editar</Link>
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(transaction.id, transaction.category)}
-                      disabled={deleteTransaction.isPending}
-                    >
-                      Excluir
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {data.items.map((transaction) => {
+                const statusDisplay =
+                  PAYMENT_STATUS_DISPLAY[transaction.effective_payment_status] ?? PAYMENT_STATUS_DISPLAY.pago;
+                return (
+                  <TableRow key={transaction.id}>
+                    <TableCell>{formatDate(transaction.occurred_at)}</TableCell>
+                    <TableCell className="capitalize">{transaction.type}</TableCell>
+                    <TableCell className="font-medium">{transaction.category}</TableCell>
+                    <TableCell className="text-right">{formatCurrencyFromString(transaction.amount)}</TableCell>
+                    <TableCell>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusDisplay.className}`}>
+                        {statusDisplay.label}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {transaction.attachment_count > 0 ? `📎 ${transaction.attachment_count}` : "—"}
+                    </TableCell>
+                    <TableCell className="space-x-2 text-right">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to={`/financeiro/${transaction.id}/editar`}>Editar</Link>
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(transaction.id, transaction.category)}
+                        disabled={deleteTransaction.isPending}
+                      >
+                        Excluir
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 

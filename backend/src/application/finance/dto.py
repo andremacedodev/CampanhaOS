@@ -13,6 +13,7 @@ class CreateFinanceTransactionInput:
     amount: Decimal
     occurred_at: date
     description: str | None = None
+    payment_status: str = "pago"
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ class UpdateFinanceTransactionInput:
     amount: Decimal | None = None
     description: str | None = None
     occurred_at: date | None = None
+    payment_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ class ListFinanceTransactionsInput:
     category: str | None = None
     occurred_after: date | None = None
     occurred_before: date | None = None
+    payment_status: str | None = None
     page: int = 1
     page_size: int = 20
 
@@ -60,6 +63,11 @@ class FinanceTransactionOutput:
     occurred_at: date
     created_at: datetime
     updated_at: datetime
+    payment_status: str
+    # "atrasado" quando aplicável — calculado no momento da consulta,
+    # nunca armazenado (ver FinanceTransaction.effective_payment_status).
+    effective_payment_status: str
+    attachment_count: int
 
 
 @dataclass(frozen=True)

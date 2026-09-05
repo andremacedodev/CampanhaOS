@@ -26,6 +26,21 @@ export const ATTACHMENT_CATEGORY_OPTIONS = [
 
 export const MAX_ATTACHMENTS_PER_TRANSACTION = 10;
 
+// Só 2 opções pra ESCOLHER — "atrasado" nunca é selecionado manualmente,
+// é sempre calculado pelo backend (pendente + data já passada).
+export const PAYMENT_STATUS_OPTIONS = [
+  { value: "pago", label: "Pago" },
+  { value: "pendente", label: "Pendente" },
+] as const;
+
+// Usa effective_payment_status (vem do backend já calculado) pra exibir
+// — nunca payment_status puro, senão "atrasado" nunca apareceria.
+export const PAYMENT_STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
+  pago: { label: "Pago", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  pendente: { label: "Pendente", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
+  atrasado: { label: "Atrasado", className: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
+};
+
 export interface FinanceTransaction {
   id: string;
   created_by_user_id: string;
@@ -36,6 +51,9 @@ export interface FinanceTransaction {
   occurred_at: string;
   created_at: string;
   updated_at: string;
+  payment_status: string;
+  effective_payment_status: string;
+  attachment_count: number;
 }
 
 export interface FinanceAttachment {
@@ -79,6 +97,7 @@ export interface FinanceTransactionFormValues {
   amount: string;
   occurred_at: string;
   description: string;
+  payment_status: string;
 }
 
 export interface FinanceTransactionCreateRequest {
@@ -87,6 +106,7 @@ export interface FinanceTransactionCreateRequest {
   amount: string;
   occurred_at: string;
   description?: string | null;
+  payment_status?: string;
 }
 
 export type FinanceTransactionUpdateRequest = Partial<FinanceTransactionCreateRequest>;
@@ -96,6 +116,7 @@ export interface FinanceTransactionListParams {
   category?: string;
   occurred_after?: string;
   occurred_before?: string;
+  payment_status?: string;
   page?: number;
   page_size?: number;
 }

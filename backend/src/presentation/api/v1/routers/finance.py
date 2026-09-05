@@ -73,6 +73,7 @@ async def create_transaction(
             amount=request.amount,
             occurred_at=request.occurred_at,
             description=request.description,
+            payment_status=request.payment_status,
         )
     )
     await session.commit()
@@ -87,6 +88,7 @@ async def list_transactions(
     category: str | None = Query(None),
     occurred_after: date | None = Query(None),
     occurred_before: date | None = Query(None),
+    payment_status: str | None = Query(None, description="Filtra por 'pago' ou 'pendente'"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> FinanceTransactionListResponse:
@@ -97,6 +99,7 @@ async def list_transactions(
             category=category,
             occurred_after=occurred_after,
             occurred_before=occurred_before,
+            payment_status=payment_status,
             page=page,
             page_size=page_size,
         )
@@ -133,6 +136,7 @@ async def update_transaction(
             amount=request.amount,
             occurred_at=request.occurred_at,
             description=request.description,
+            payment_status=request.payment_status,
         )
     )
     await session.commit()

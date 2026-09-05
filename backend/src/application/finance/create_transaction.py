@@ -17,6 +17,10 @@ class CreateFinanceTransactionUseCase:
             amount=input_data.amount,
             occurred_at=input_data.occurred_at,
             description=input_data.description,
+            payment_status=input_data.payment_status,
         )
         await self._finance_repository.save(transaction)
-        return transaction_to_output(transaction)
+        # attachment_count sempre 0 aqui — um lançamento recém-criado
+        # nunca pode ter anexo ainda (upload só é possível depois do
+        # lançamento já existir, é um passo separado).
+        return transaction_to_output(transaction, attachment_count=0)

@@ -61,8 +61,9 @@ def get_create_finance_transaction_use_case(
 
 def get_get_finance_transaction_use_case(
     finance_repository: FinanceRepositoryDep,
+    attachment_repository: FinanceAttachmentRepositoryDep,
 ) -> GetFinanceTransactionUseCase:
-    return GetFinanceTransactionUseCase(finance_repository)
+    return GetFinanceTransactionUseCase(finance_repository, attachment_repository)
 
 
 def get_list_finance_transactions_use_case(
@@ -73,8 +74,9 @@ def get_list_finance_transactions_use_case(
 
 def get_update_finance_transaction_use_case(
     finance_repository: FinanceRepositoryDep,
+    attachment_repository: FinanceAttachmentRepositoryDep,
 ) -> UpdateFinanceTransactionUseCase:
-    return UpdateFinanceTransactionUseCase(finance_repository)
+    return UpdateFinanceTransactionUseCase(finance_repository, attachment_repository)
 
 
 def get_delete_finance_transaction_use_case(

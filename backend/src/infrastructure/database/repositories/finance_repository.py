@@ -9,8 +9,14 @@ from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.finance.entities import FinanceTransaction
-from src.domain.finance.repository import FinanceFilter, FinancePage, FinanceRepository, FinanceSummary
-from src.infrastructure.database.models import FinanceTransactionModel
+from src.domain.finance.repository import (
+    FinanceFilter,
+    FinancePage,
+    FinanceRepository,
+    FinanceSummary,
+    FinanceTransactionListItem,
+)
+from src.infrastructure.database.models import FinanceAttachmentModel, FinanceTransactionModel
 
 
 class SqlAlchemyFinanceRepository(FinanceRepository):
@@ -30,6 +36,7 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
                 description=transaction.description,
                 occurred_at=transaction.occurred_at,
                 deleted_at=transaction.deleted_at,
+                payment_status=transaction.payment_status,
             )
             self._session.add(model)
         else:
@@ -39,6 +46,7 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             existing.description = transaction.description
             existing.occurred_at = transaction.occurred_at
             existing.deleted_at = transaction.deleted_at
+            existing.payment_status = transaction.payment_status
 
         await self._session.flush()
 
@@ -63,6 +71,8 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             conditions.append(FinanceTransactionModel.occurred_at >= filters.occurred_after)
         if filters.occurred_before:
             conditions.append(FinanceTransactionModel.occurred_at <= filters.occurred_before)
+        if filters.payment_status:
+            conditions.append(FinanceTransactionModel.payment_status == filters.payment_status)
 
         return conditions
 
@@ -78,17 +88,26 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
         count_stmt = select(func.count()).select_from(FinanceTransactionModel).where(*conditions)
         total = (await self._session.execute(count_stmt)).scalar_one()
 
+        # LEFT JOIN + COUNT: uma query só traz a transação E quantos
+        # anexos ela tem, sem precisar de uma consulta extra por
+        # lançamento (evitaria N+1 se fosse um loop chamando
+        # count_by_transaction pra cada item da página).
         list_stmt = (
-            select(FinanceTransactionModel)
+            select(FinanceTransactionModel, func.count(FinanceAttachmentModel.id))
+            .outerjoin(FinanceAttachmentModel, FinanceAttachmentModel.transaction_id == FinanceTransactionModel.id)
             .where(*conditions)
+            .group_by(FinanceTransactionModel.id)
             .order_by(FinanceTransactionModel.occurred_at.desc(), FinanceTransactionModel.id.asc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
-        models = (await self._session.execute(list_stmt)).scalars().all()
+        rows = (await self._session.execute(list_stmt)).all()
 
         return FinancePage(
-            items=[self._to_domain(m) for m in models],
+            items=[
+                FinanceTransactionListItem(transaction=self._to_domain(model), attachment_count=count)
+                for model, count in rows
+            ],
             total=total,
             page=page,
             page_size=page_size,
@@ -125,4 +144,6 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             created_at=model.created_at,
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,
+            payment_status=model.payment_status,
         )
+

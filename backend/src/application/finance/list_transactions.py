@@ -18,6 +18,7 @@ class ListFinanceTransactionsUseCase:
             category=input_data.category,
             occurred_after=input_data.occurred_after,
             occurred_before=input_data.occurred_before,
+            payment_status=input_data.payment_status,
             include_deleted=False,
         )
 
@@ -29,7 +30,10 @@ class ListFinanceTransactionsUseCase:
         summary = await self._finance_repository.get_summary(input_data.tenant_id, filters)
 
         return ListFinanceTransactionsOutput(
-            items=[transaction_to_output(t) for t in result.items],
+            items=[
+                transaction_to_output(item.transaction, attachment_count=item.attachment_count)
+                for item in result.items
+            ],
             total=result.total,
             page=result.page,
             page_size=result.page_size,

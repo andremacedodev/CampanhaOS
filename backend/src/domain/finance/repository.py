@@ -17,12 +17,27 @@ class FinanceFilter:
     category: str | None = None
     occurred_after: date | None = None
     occurred_before: date | None = None
+    payment_status: str | None = None  # filtra por "pago" ou "pendente" — "atrasado" é calculado, não filtrável no banco
     include_deleted: bool = False
 
 
 @dataclass(frozen=True)
+class FinanceTransactionListItem:
+    """
+    Par (lançamento, quantidade de anexos) — usado só na LISTAGEM, pra
+    mostrar na tela se tem documento anexado sem precisar abrir cada
+    lançamento individualmente. `find_by_id` continua retornando só
+    `FinanceTransaction` puro; essa contagem é uma preocupação
+    específica de exibição em lista.
+    """
+
+    transaction: FinanceTransaction
+    attachment_count: int
+
+
+@dataclass(frozen=True)
 class FinancePage:
-    items: list[FinanceTransaction]
+    items: list[FinanceTransactionListItem]
     total: int
     page: int
     page_size: int

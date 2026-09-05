@@ -1,9 +1,11 @@
+from datetime import date
+
 from src.application.finance.dto import FinanceAttachmentOutput, FinanceSummaryOutput, FinanceTransactionOutput
 from src.domain.finance.entities import FinanceAttachment, FinanceTransaction
 from src.domain.finance.repository import FinanceSummary
 
 
-def transaction_to_output(transaction: FinanceTransaction) -> FinanceTransactionOutput:
+def transaction_to_output(transaction: FinanceTransaction, attachment_count: int) -> FinanceTransactionOutput:
     return FinanceTransactionOutput(
         id=transaction.id,
         created_by_user_id=transaction.created_by_user_id,
@@ -14,6 +16,9 @@ def transaction_to_output(transaction: FinanceTransaction) -> FinanceTransaction
         occurred_at=transaction.occurred_at,
         created_at=transaction.created_at,
         updated_at=transaction.updated_at,
+        payment_status=transaction.payment_status,
+        effective_payment_status=transaction.effective_payment_status(date.today()),
+        attachment_count=attachment_count,
     )
 
 

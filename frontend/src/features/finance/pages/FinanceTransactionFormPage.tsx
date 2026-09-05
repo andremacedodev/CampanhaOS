@@ -27,6 +27,7 @@ export function FinanceTransactionFormPage() {
       amount: values.amount,
       occurred_at: values.occurred_at,
       description: values.description || null,
+      payment_status: values.payment_status,
     };
 
     if (isEditMode) {

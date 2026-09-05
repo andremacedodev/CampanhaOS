@@ -11,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TransactionType = Literal["receita", "despesa", "doacao"]
 AttachmentCategory = Literal["comprovante", "contrato", "orcamento", "outro"]
+# "atrasado" nunca aparece aqui — só existe como valor CALCULADO no
+# campo effective_payment_status da resposta, nunca como algo que se
+# escolhe ao criar/editar um lançamento.
+PaymentStatus = Literal["pago", "pendente"]
 
 
 class FinanceTransactionCreateRequest(BaseModel):
@@ -19,6 +23,7 @@ class FinanceTransactionCreateRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Sempre positivo — o tipo determina se soma ou subtrai")
     occurred_at: date
     description: str | None = None
+    payment_status: PaymentStatus = "pago"
 
 
 class FinanceTransactionUpdateRequest(BaseModel):
@@ -27,6 +32,7 @@ class FinanceTransactionUpdateRequest(BaseModel):
     amount: Decimal | None = Field(None, gt=0)
     occurred_at: date | None = None
     description: str | None = None
+    payment_status: PaymentStatus | None = None
 
 
 class FinanceTransactionResponse(BaseModel):
@@ -41,6 +47,9 @@ class FinanceTransactionResponse(BaseModel):
     occurred_at: date
     created_at: datetime
     updated_at: datetime
+    payment_status: str
+    effective_payment_status: str
+    attachment_count: int
 
 
 class FinanceSummaryResponse(BaseModel):

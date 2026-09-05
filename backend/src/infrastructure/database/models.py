@@ -273,6 +273,7 @@ class FinanceTransactionModel(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(String)
     occurred_at: Mapped[date] = mapped_column(Date, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pago")
 
 
 class FinanceAttachmentModel(Base):
