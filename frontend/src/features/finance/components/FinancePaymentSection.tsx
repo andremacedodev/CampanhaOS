@@ -101,16 +101,21 @@ export function FinancePaymentSection({ transaction }: FinancePaymentSectionProp
           <p className="font-medium text-emerald-600">{formatCurrencyFromString(transaction.amount_paid)}</p>
         </div>
         <div className="col-span-2">
-          <p className="text-xs text-muted-foreground">
-            {transaction.amount_remaining.startsWith("-") ? "Pago a Mais" : "Falta Pagar"}
-          </p>
-          <p className="font-medium">
-            {formatCurrencyFromString(
-              transaction.amount_remaining.startsWith("-")
-                ? transaction.amount_remaining.slice(1)
-                : transaction.amount_remaining,
-            )}
-          </p>
+          {/* Proteção defensiva contra amount_remaining vindo undefined
+              (mesmo padrão já usado nos gráficos do painel) — calcula
+              uma vez só em vez de checar .startsWith duas vezes. */}
+          {(() => {
+            const isOverpaid = (transaction.amount_remaining ?? "").startsWith("-");
+            const displayValue = isOverpaid
+              ? transaction.amount_remaining?.slice(1)
+              : transaction.amount_remaining;
+            return (
+              <>
+                <p className="text-xs text-muted-foreground">{isOverpaid ? "Pago a Mais" : "Falta Pagar"}</p>
+                <p className="font-medium">{formatCurrencyFromString(displayValue)}</p>
+              </>
+            );
+          })()}
         </div>
       </div>
 

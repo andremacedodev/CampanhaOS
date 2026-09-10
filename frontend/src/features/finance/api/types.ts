@@ -137,7 +137,11 @@ export interface FinanceTransactionListParams {
 }
 
 /** Formata um valor Decimal-como-string para exibição em R$, sem passar por número JS. */
-export function formatCurrencyFromString(value: string): string {
+export function formatCurrencyFromString(value: string | undefined | null): string {
+  // Proteção defensiva — mesmo padrão já usado nos gráficos do painel:
+  // evita quebrar a página inteira se esse campo vier undefined (ex:
+  // descompasso temporário entre deploy do frontend e do backend).
+  if (value === undefined || value === null) return "R$ —";
   const isNegative = value.startsWith("-");
   const unsigned = isNegative ? value.slice(1) : value;
   const [integerPart, decimalPart = "00"] = unsigned.split(".");
