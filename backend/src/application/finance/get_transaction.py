@@ -2,15 +2,20 @@ from src.application.finance.dto import FinanceTransactionOutput, GetFinanceTran
 from src.application.finance.exceptions import FinanceTransactionNotFoundError
 from src.application.finance.mapper import transaction_to_output
 from src.domain.finance.attachment_repository import FinanceAttachmentRepository
+from src.domain.finance.payment_repository import FinancePaymentRepository
 from src.domain.finance.repository import FinanceRepository
 
 
 class GetFinanceTransactionUseCase:
     def __init__(
-        self, finance_repository: FinanceRepository, attachment_repository: FinanceAttachmentRepository
+        self,
+        finance_repository: FinanceRepository,
+        attachment_repository: FinanceAttachmentRepository,
+        payment_repository: FinancePaymentRepository,
     ) -> None:
         self._finance_repository = finance_repository
         self._attachment_repository = attachment_repository
+        self._payment_repository = payment_repository
 
     async def execute(self, input_data: GetFinanceTransactionInput) -> FinanceTransactionOutput:
         transaction = await self._finance_repository.find_by_id(
@@ -22,4 +27,9 @@ class GetFinanceTransactionUseCase:
         attachment_count = await self._attachment_repository.count_by_transaction(
             input_data.tenant_id, input_data.transaction_id
         )
-        return transaction_to_output(transaction, attachment_count=attachment_count)
+        # Receita/doação nunca têm pagamento registrado (não existe essa
+        # tela pra elas) — mas buscar mesmo assim é seguro, só retorna 0.
+        amount_paid = await self._payment_repository.get_total_paid(
+            input_data.tenant_id, input_data.transaction_id
+        )
+        return transaction_to_output(transaction, attachment_count=attachment_count, amount_paid=amount_paid)

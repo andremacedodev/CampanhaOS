@@ -12,14 +12,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from src.application.finance.add_attachment import AddFinanceAttachmentInput, AddFinanceAttachmentUseCase
+from src.application.finance.add_payment import AddFinancePaymentUseCase
 from src.application.finance.create_transaction import CreateFinanceTransactionUseCase
 from src.application.finance.delete_transaction import DeleteFinanceTransactionUseCase
 from src.application.finance.dto import (
+    AddFinancePaymentInput,
     CreateFinanceTransactionInput,
     DeleteFinanceTransactionInput,
     GetFinanceTransactionInput,
     ListFinanceAttachmentsInput,
+    ListFinancePaymentsInput,
     ListFinanceTransactionsInput,
+    RemoveFinancePaymentInput,
     UpdateFinanceTransactionInput,
 )
 from src.application.finance.get_attachment_download_url import (
@@ -28,19 +32,24 @@ from src.application.finance.get_attachment_download_url import (
 )
 from src.application.finance.get_transaction import GetFinanceTransactionUseCase
 from src.application.finance.list_attachments import ListFinanceAttachmentsUseCase
+from src.application.finance.list_payments import ListFinancePaymentsUseCase
 from src.application.finance.list_transactions import ListFinanceTransactionsUseCase
 from src.application.finance.remove_attachment import RemoveFinanceAttachmentInput, RemoveFinanceAttachmentUseCase
+from src.application.finance.remove_payment import RemoveFinancePaymentUseCase
 from src.application.finance.update_transaction import UpdateFinanceTransactionUseCase
 from src.presentation.api.dependencies import CurrentUser, DbSession
 from src.presentation.api.finance_dependencies import (
     get_add_finance_attachment_use_case,
+    get_add_finance_payment_use_case,
     get_create_finance_transaction_use_case,
     get_delete_finance_transaction_use_case,
     get_finance_attachment_download_url_use_case,
     get_get_finance_transaction_use_case,
     get_list_finance_attachments_use_case,
+    get_list_finance_payments_use_case,
     get_list_finance_transactions_use_case,
     get_remove_finance_attachment_use_case,
+    get_remove_finance_payment_use_case,
     get_update_finance_transaction_use_case,
 )
 from src.presentation.api.v1.schemas.finance import (
@@ -48,6 +57,9 @@ from src.presentation.api.v1.schemas.finance import (
     FinanceAttachmentDownloadResponse,
     FinanceAttachmentListResponse,
     FinanceAttachmentResponse,
+    FinancePaymentCreateRequest,
+    FinancePaymentListResponse,
+    FinancePaymentResponse,
     FinanceTransactionCreateRequest,
     FinanceTransactionListResponse,
     FinanceTransactionResponse,
@@ -73,7 +85,6 @@ async def create_transaction(
             amount=request.amount,
             occurred_at=request.occurred_at,
             description=request.description,
-            payment_status=request.payment_status,
         )
     )
     await session.commit()
@@ -88,7 +99,6 @@ async def list_transactions(
     category: str | None = Query(None),
     occurred_after: date | None = Query(None),
     occurred_before: date | None = Query(None),
-    payment_status: str | None = Query(None, description="Filtra por 'pago' ou 'pendente'"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> FinanceTransactionListResponse:
@@ -99,7 +109,6 @@ async def list_transactions(
             category=category,
             occurred_after=occurred_after,
             occurred_before=occurred_before,
-            payment_status=payment_status,
             page=page,
             page_size=page_size,
         )
@@ -136,7 +145,6 @@ async def update_transaction(
             amount=request.amount,
             occurred_at=request.occurred_at,
             description=request.description,
-            payment_status=request.payment_status,
         )
     )
     await session.commit()
@@ -225,3 +233,52 @@ async def get_attachment_download_url(
         )
     )
     return FinanceAttachmentDownloadResponse(download_url=output.download_url, filename=output.filename)
+
+
+@router.post("/{transaction_id}/payments", response_model=FinancePaymentResponse, status_code=status.HTTP_201_CREATED)
+async def add_payment(
+    transaction_id: UUID,
+    current_user: CurrentUser,
+    request: FinancePaymentCreateRequest,
+    session: DbSession,
+    use_case: Annotated[AddFinancePaymentUseCase, Depends(get_add_finance_payment_use_case)],
+) -> FinancePaymentResponse:
+    output = await use_case.execute(
+        AddFinancePaymentInput(
+            tenant_id=current_user.tenant_id,
+            transaction_id=transaction_id,
+            created_by_user_id=current_user.id,
+            amount=request.amount,
+            paid_at=request.paid_at,
+        )
+    )
+    await session.commit()
+    return FinancePaymentResponse.model_validate(output)
+
+
+@router.get("/{transaction_id}/payments", response_model=FinancePaymentListResponse)
+async def list_payments(
+    transaction_id: UUID,
+    current_user: CurrentUser,
+    use_case: Annotated[ListFinancePaymentsUseCase, Depends(get_list_finance_payments_use_case)],
+) -> FinancePaymentListResponse:
+    items = await use_case.execute(
+        ListFinancePaymentsInput(tenant_id=current_user.tenant_id, transaction_id=transaction_id)
+    )
+    return FinancePaymentListResponse(items=[FinancePaymentResponse.model_validate(i) for i in items])
+
+
+@router.delete("/{transaction_id}/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_payment(
+    transaction_id: UUID,
+    payment_id: UUID,
+    current_user: CurrentUser,
+    session: DbSession,
+    use_case: Annotated[RemoveFinancePaymentUseCase, Depends(get_remove_finance_payment_use_case)],
+) -> None:
+    await use_case.execute(
+        RemoveFinancePaymentInput(
+            tenant_id=current_user.tenant_id, transaction_id=transaction_id, payment_id=payment_id
+        )
+    )
+    await session.commit()

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from src.application.finance.dto import CreateFinanceTransactionInput, FinanceTransactionOutput
 from src.application.finance.mapper import transaction_to_output
 from src.domain.finance.entities import FinanceTransaction
@@ -17,10 +19,10 @@ class CreateFinanceTransactionUseCase:
             amount=input_data.amount,
             occurred_at=input_data.occurred_at,
             description=input_data.description,
-            payment_status=input_data.payment_status,
         )
         await self._finance_repository.save(transaction)
-        # attachment_count sempre 0 aqui — um lançamento recém-criado
-        # nunca pode ter anexo ainda (upload só é possível depois do
-        # lançamento já existir, é um passo separado).
-        return transaction_to_output(transaction, attachment_count=0)
+        # attachment_count e amount_paid sempre 0 aqui — um lançamento
+        # recém-criado nunca pode ter anexo nem pagamento ainda (os dois
+        # só existem como passos separados, depois do lançamento já
+        # existir).
+        return transaction_to_output(transaction, attachment_count=0, amount_paid=Decimal("0"))

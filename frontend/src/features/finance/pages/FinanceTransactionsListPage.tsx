@@ -39,12 +39,10 @@ function formatDate(iso: string): string {
 
 export function FinanceTransactionsListPage() {
   const [typeFilter, setTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError } = useFinanceTransactions({
     type: typeFilter || undefined,
-    payment_status: statusFilter || undefined,
     page,
     page_size: PAGE_SIZE,
   });
@@ -79,15 +77,7 @@ export function FinanceTransactionsListPage() {
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Receitas</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xl font-semibold text-emerald-600">
-              {formatCurrencyFromString(data.summary.total_receitas)}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Despesas</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Despesas Lançadas</CardTitle>
             </CardHeader>
             <CardContent className="text-xl font-semibold text-destructive">
               {formatCurrencyFromString(data.summary.total_despesas)}
@@ -95,56 +85,46 @@ export function FinanceTransactionsListPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Doações</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Pago</CardTitle>
             </CardHeader>
             <CardContent className="text-xl font-semibold text-emerald-600">
-              {formatCurrencyFromString(data.summary.total_doacoes)}
+              {formatCurrencyFromString(data.summary.total_pago)}
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Saldo</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total a Pagar</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xl font-semibold text-amber-600">
+              {formatCurrencyFromString(data.summary.total_a_pagar)}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Saldo Atual</CardTitle>
             </CardHeader>
             <CardContent className="text-xl font-semibold">
-              {formatCurrencyFromString(data.summary.saldo)}
+              {formatCurrencyFromString(data.summary.saldo_atual)}
             </CardContent>
           </Card>
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Select
-          value={typeFilter}
-          onChange={(e) => {
-            setTypeFilter(e.target.value);
-            setPage(1);
-          }}
-          className="max-w-xs"
-        >
-          <option value="">Todos os tipos</option>
-          {TRANSACTION_TYPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-
-        <Select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          className="max-w-xs"
-        >
-          <option value="">Todos os status</option>
-          <option value="pago">Pago</option>
-          {/* Enviar "pendente" pro backend já traz junto o que está
-              "atrasado" (é um subconjunto de pendente) — a distinção
-              visual entre os dois aparece no badge de cada linha. */}
-          <option value="pendente">Pendente / Atrasado</option>
-        </Select>
-      </div>
+      <Select
+        value={typeFilter}
+        onChange={(e) => {
+          setTypeFilter(e.target.value);
+          setPage(1);
+        }}
+        className="max-w-xs"
+      >
+        <option value="">Todos os tipos</option>
+        {TRANSACTION_TYPE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
 
       {isLoading && <p className="text-muted-foreground">Carregando...</p>}
       {isError && <p className="text-destructive">Não foi possível carregar os lançamentos.</p>}
@@ -172,8 +152,9 @@ export function FinanceTransactionsListPage() {
                 </TableRow>
               )}
               {data.items.map((transaction) => {
-                const statusDisplay =
-                  PAYMENT_STATUS_DISPLAY[transaction.effective_payment_status] ?? PAYMENT_STATUS_DISPLAY.pago;
+                const statusDisplay = transaction.effective_payment_status
+                  ? PAYMENT_STATUS_DISPLAY[transaction.effective_payment_status]
+                  : null;
                 return (
                   <TableRow key={transaction.id}>
                     <TableCell>{formatDate(transaction.occurred_at)}</TableCell>
@@ -181,9 +162,13 @@ export function FinanceTransactionsListPage() {
                     <TableCell className="font-medium">{transaction.category}</TableCell>
                     <TableCell className="text-right">{formatCurrencyFromString(transaction.amount)}</TableCell>
                     <TableCell>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusDisplay.className}`}>
-                        {statusDisplay.label}
-                      </span>
+                      {statusDisplay ? (
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusDisplay.className}`}>
+                          {statusDisplay.label}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {transaction.attachment_count > 0 ? `📎 ${transaction.attachment_count}` : "—"}

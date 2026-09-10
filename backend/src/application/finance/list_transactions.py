@@ -18,7 +18,6 @@ class ListFinanceTransactionsUseCase:
             category=input_data.category,
             occurred_after=input_data.occurred_after,
             occurred_before=input_data.occurred_before,
-            payment_status=input_data.payment_status,
             include_deleted=False,
         )
 
@@ -31,7 +30,9 @@ class ListFinanceTransactionsUseCase:
 
         return ListFinanceTransactionsOutput(
             items=[
-                transaction_to_output(item.transaction, attachment_count=item.attachment_count)
+                transaction_to_output(
+                    item.transaction, attachment_count=item.attachment_count, amount_paid=item.amount_paid
+                )
                 for item in result.items
             ],
             total=result.total,

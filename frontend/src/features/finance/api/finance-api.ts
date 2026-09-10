@@ -3,6 +3,9 @@ import type {
   FinanceAttachment,
   FinanceAttachmentDownloadResponse,
   FinanceAttachmentListResponse,
+  FinancePayment,
+  FinancePaymentCreateRequest,
+  FinancePaymentListResponse,
   FinanceTransaction,
   FinanceTransactionCreateRequest,
   FinanceTransactionListParams,
@@ -71,4 +74,21 @@ export async function getFinanceAttachmentDownloadUrl(
     `/finance/${transactionId}/attachments/${attachmentId}/download-url`,
   );
   return response.data;
+}
+
+export async function addFinancePayment(
+  transactionId: string,
+  data: FinancePaymentCreateRequest,
+): Promise<FinancePayment> {
+  const response = await apiClient.post<FinancePayment>(`/finance/${transactionId}/payments`, data);
+  return response.data;
+}
+
+export async function listFinancePayments(transactionId: string): Promise<FinancePaymentListResponse> {
+  const response = await apiClient.get<FinancePaymentListResponse>(`/finance/${transactionId}/payments`);
+  return response.data;
+}
+
+export async function removeFinancePayment(transactionId: string, paymentId: string): Promise<void> {
+  await apiClient.delete(`/finance/${transactionId}/payments/${paymentId}`);
 }

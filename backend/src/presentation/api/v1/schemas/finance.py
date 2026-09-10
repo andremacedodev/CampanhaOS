@@ -11,10 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TransactionType = Literal["receita", "despesa", "doacao"]
 AttachmentCategory = Literal["comprovante", "contrato", "orcamento", "outro"]
-# "atrasado" nunca aparece aqui — só existe como valor CALCULADO no
-# campo effective_payment_status da resposta, nunca como algo que se
-# escolhe ao criar/editar um lançamento.
-PaymentStatus = Literal["pago", "pendente"]
 
 
 class FinanceTransactionCreateRequest(BaseModel):
@@ -23,7 +19,6 @@ class FinanceTransactionCreateRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Sempre positivo — o tipo determina se soma ou subtrai")
     occurred_at: date
     description: str | None = None
-    payment_status: PaymentStatus = "pago"
 
 
 class FinanceTransactionUpdateRequest(BaseModel):
@@ -32,7 +27,6 @@ class FinanceTransactionUpdateRequest(BaseModel):
     amount: Decimal | None = Field(None, gt=0)
     occurred_at: date | None = None
     description: str | None = None
-    payment_status: PaymentStatus | None = None
 
 
 class FinanceTransactionResponse(BaseModel):
@@ -47,8 +41,12 @@ class FinanceTransactionResponse(BaseModel):
     occurred_at: date
     created_at: datetime
     updated_at: datetime
-    payment_status: str
-    effective_payment_status: str
+    # None pra receita/doação — só despesa tem controle de pagamento
+    # nessa versão. Nunca escolhido manualmente, sempre calculado a
+    # partir da soma de pagamentos reais registrados.
+    effective_payment_status: str | None
+    amount_paid: Decimal
+    amount_remaining: Decimal
     attachment_count: int
 
 
@@ -58,7 +56,9 @@ class FinanceSummaryResponse(BaseModel):
     total_receitas: Decimal
     total_despesas: Decimal
     total_doacoes: Decimal
-    saldo: Decimal
+    total_pago: Decimal
+    total_a_pagar: Decimal
+    saldo_atual: Decimal
 
 
 class FinanceTransactionListResponse(BaseModel):
@@ -91,3 +91,22 @@ class FinanceAttachmentListResponse(BaseModel):
 class FinanceAttachmentDownloadResponse(BaseModel):
     download_url: str
     filename: str
+
+
+class FinancePaymentCreateRequest(BaseModel):
+    amount: Decimal = Field(..., gt=0)
+    paid_at: date
+
+
+class FinancePaymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    transaction_id: UUID
+    amount: Decimal
+    paid_at: date
+    created_at: datetime
+
+
+class FinancePaymentListResponse(BaseModel):
+    items: list[FinancePaymentResponse]

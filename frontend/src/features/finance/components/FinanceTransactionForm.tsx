@@ -4,7 +4,6 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Select } from "@/shared/components/ui/select";
 import {
-  PAYMENT_STATUS_OPTIONS,
   TRANSACTION_TYPE_OPTIONS,
   type FinanceTransaction,
   type FinanceTransactionFormValues,
@@ -33,7 +32,6 @@ function transactionToFormValues(transaction: FinanceTransaction | undefined): F
     amount: transaction?.amount ?? "",
     occurred_at: transaction?.occurred_at ?? todayAsDateInputValue(),
     description: transaction?.description ?? "",
-    payment_status: transaction?.payment_status ?? "pago",
   };
 }
 
@@ -69,34 +67,21 @@ export function FinanceTransactionForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="type">Tipo</Label>
-          <Select id="type" value={values.type} onChange={(e) => updateField("type", e.target.value)}>
-            {TRANSACTION_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="payment_status">Status de Pagamento</Label>
-          <Select
-            id="payment_status"
-            value={values.payment_status}
-            onChange={(e) => updateField("payment_status", e.target.value)}
-          >
-            {PAYMENT_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+      <div className="space-y-2">
+        <Label htmlFor="type">Tipo</Label>
+        <Select id="type" value={values.type} onChange={(e) => updateField("type", e.target.value)}>
+          {TRANSACTION_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+        {values.type === "despesa" && (
           <p className="text-xs text-muted-foreground">
-            Se ficar "Pendente" e a data já tiver passado, aparece como "Atrasado" na lista automaticamente.
+            O status de pagamento (Pago/Parcial/Pendente/Atrasado) é calculado automaticamente — registra os
+            pagamentos depois de salvar este lançamento.
           </p>
-        </div>
+        )}
       </div>
 
       <div className="space-y-2">

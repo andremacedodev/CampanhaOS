@@ -1,6 +1,8 @@
 """
 Entidades de domínio do módulo financeiro: FinanceTransaction (lançamento
-financeiro) e FinanceAttachment (documento anexado a um lançamento).
+financeiro), FinanceAttachment (documento anexado), e FinancePayment
+(um pagamento individual feito contra uma despesa — suporta pagamento
+parcial, em várias parcelas ao longo do tempo).
 
 RF-12 (Fase 1): receitas, despesas e doações da campanha.
 
@@ -15,10 +17,19 @@ somam, despesa subtrai). Isso evita a ambiguidade de "valor negativo
 representando uma despesa", que é fácil de inverter por engano em algum
 cálculo futuro.
 
-FinanceAttachment é uma entidade PRÓPRIA (não campos soltos dentro de
-FinanceTransaction) — um lançamento pode ter vários documentos
-(comprovante, contrato, orçamento), até um limite de 10. Cada anexo tem
-seu próprio ciclo de vida (upload/remoção independente).
+FinanceAttachment e FinancePayment são entidades PRÓPRIAS (não campos
+soltos dentro de FinanceTransaction) — um lançamento pode ter vários
+documentos e, se for despesa, vários pagamentos parciais ao longo do
+tempo. Cada um tem seu próprio ciclo de vida independente.
+
+DECISÃO: pagamento parcial só existe pra DESPESA — receita/doação
+continuam sendo tratadas como "realizadas" assim que lançadas (sem
+controle de recebimento parcial). O status "pago/pendente/parcial/
+atrasado" NUNCA é escolhido manualmente — é sempre CALCULADO a partir da
+soma dos pagamentos reais registrados (ver
+FinanceTransaction.compute_effective_status). Pagar MAIS que o valor
+lançado é permitido (pode acontecer na vida real) — o sistema não
+bloqueia, só mostra a diferença.
 """
 
 from dataclasses import dataclass
@@ -44,13 +55,6 @@ VALID_ATTACHMENT_CATEGORIES = frozenset({"comprovante", "contrato", "orcamento",
 
 MAX_ATTACHMENTS_PER_TRANSACTION = 10
 
-# Só 2 estados são ARMAZENADOS — "atrasado" nunca é gravado no banco, é
-# sempre CALCULADO na hora de exibir (pendente + data já passada = mostra
-# como atrasado). Guardar "atrasado" de verdade exigiria um job rodando
-# todo dia só pra atualizar status conforme o tempo passa — desnecessário
-# quando dá pra calcular isso a qualquer momento a partir da data.
-VALID_PAYMENT_STATUSES = frozenset({"pago", "pendente"})
-
 
 class InvalidTransactionTypeError(DomainError):
     def __init__(self, value: str) -> None:
@@ -62,13 +66,6 @@ class InvalidTransactionTypeError(DomainError):
 class InvalidAmountError(DomainError):
     def __init__(self) -> None:
         super().__init__("O valor do lançamento precisa ser maior que zero")
-
-
-class InvalidPaymentStatusError(DomainError):
-    def __init__(self, value: str) -> None:
-        super().__init__(
-            f"Status de pagamento '{value}' inválido. Valores aceitos: {', '.join(sorted(VALID_PAYMENT_STATUSES))}"
-        )
 
 
 class InvalidAttachmentError(DomainError):
@@ -89,6 +86,16 @@ class TooManyAttachmentsError(DomainError):
         super().__init__(f"Limite de {MAX_ATTACHMENTS_PER_TRANSACTION} anexos por lançamento atingido")
 
 
+class InvalidPaymentAmountError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("O valor do pagamento precisa ser maior que zero")
+
+
+class PaymentsOnlyForExpensesError(DomainError):
+    def __init__(self) -> None:
+        super().__init__("Controle de pagamento parcial só existe para lançamentos do tipo despesa")
+
+
 @dataclass
 class FinanceTransaction:
     id: UUID
@@ -102,11 +109,6 @@ class FinanceTransaction:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
-    # Default "pago" — lançamentos criados sem informar nada continuam
-    # representando o comportamento de antes dessa funcionalidade
-    # existir (a maioria já estava paga; quem cadastra escolhe
-    # "pendente" só quando for o caso).
-    payment_status: str = "pago"
 
     @staticmethod
     def create(
@@ -117,12 +119,10 @@ class FinanceTransaction:
         amount: Decimal,
         occurred_at: date,
         description: str | None = None,
-        payment_status: str = "pago",
     ) -> "FinanceTransaction":
         FinanceTransaction._validate_type(type)
         FinanceTransaction._validate_category(category)
         FinanceTransaction._validate_amount(amount)
-        FinanceTransaction._validate_payment_status(payment_status)
 
         now = datetime.now(UTC)
         return FinanceTransaction(
@@ -137,7 +137,6 @@ class FinanceTransaction:
             created_at=now,
             updated_at=now,
             deleted_at=None,
-            payment_status=payment_status,
         )
 
     @staticmethod
@@ -155,11 +154,6 @@ class FinanceTransaction:
         if amount <= 0:
             raise InvalidAmountError
 
-    @staticmethod
-    def _validate_payment_status(payment_status: str) -> None:
-        if payment_status not in VALID_PAYMENT_STATUSES:
-            raise InvalidPaymentStatusError(payment_status)
-
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
@@ -172,17 +166,26 @@ class FinanceTransaction:
         """
         return -self.amount if self.type == "despesa" else self.amount
 
-    def effective_payment_status(self, today: date) -> str:
+    def compute_effective_status(self, total_paid: Decimal, today: date) -> str | None:
         """
-        Status "de exibição" — igual a `payment_status`, exceto quando
-        está "pendente" E a data do lançamento já passou, caso em que
-        vira "atrasado". Nunca gravado no banco, sempre calculado com a
-        data atual passada por quem chama (facilita teste — sem isso,
-        um teste escrito hoje quebraria sozinho amanhã).
+        Status calculado a partir da soma real de pagamentos —
+        NUNCA armazenado, sempre recalculado. Só existe pra despesa;
+        receita/doação retornam None (não têm esse controle).
+
+        - total_paid <= 0 e data ainda não passou -> "pendente"
+        - total_paid <= 0 e data já passou -> "atrasado"
+        - 0 < total_paid < amount -> "parcial"
+        - total_paid >= amount -> "pago" (mesmo se pago A MAIS — sem
+          bloqueio nesse caso, só deixa de ser "parcial")
         """
-        if self.payment_status == "pendente" and self.occurred_at < today:
-            return "atrasado"
-        return self.payment_status
+        if self.type != "despesa":
+            return None
+
+        if total_paid <= 0:
+            return "atrasado" if self.occurred_at < today else "pendente"
+        if total_paid < self.amount:
+            return "parcial"
+        return "pago"
 
     def update_details(
         self,
@@ -192,7 +195,6 @@ class FinanceTransaction:
         amount: Decimal | None = None,
         description: str | None = None,
         occurred_at: date | None = None,
-        payment_status: str | None = None,
     ) -> None:
         if type is not None:
             FinanceTransaction._validate_type(type)
@@ -207,9 +209,6 @@ class FinanceTransaction:
             self.description = description or None
         if occurred_at is not None:
             self.occurred_at = occurred_at
-        if payment_status is not None:
-            FinanceTransaction._validate_payment_status(payment_status)
-            self.payment_status = payment_status
 
         self.updated_at = datetime.now(UTC)
 
@@ -272,4 +271,48 @@ class FinanceAttachment:
             content_type=content_type,
             size_bytes=size_bytes,
             uploaded_at=datetime.now(UTC),
+        )
+
+
+@dataclass
+class FinancePayment:
+    """
+    Um pagamento individual contra uma despesa — permite registrar
+    quitação em várias partes ao longo do tempo (ex: lançou R$1.500,
+    paga R$500 agora, R$1.000 depois — dois FinancePayment separados).
+
+    Validação de "não pode ultrapassar o total" NÃO acontece aqui —
+    pagar a mais é permitido de propósito (decisão explícita). A
+    validação de que só existe pagamento pra despesa acontece na camada
+    de aplicação (precisa consultar o tipo do FinanceTransaction, que
+    esta entidade não tem acesso direto).
+    """
+
+    id: UUID
+    tenant_id: UUID
+    transaction_id: UUID
+    created_by_user_id: UUID
+    amount: Decimal
+    paid_at: date
+    created_at: datetime
+
+    @staticmethod
+    def create(
+        tenant_id: UUID,
+        transaction_id: UUID,
+        created_by_user_id: UUID,
+        amount: Decimal,
+        paid_at: date,
+    ) -> "FinancePayment":
+        if amount <= 0:
+            raise InvalidPaymentAmountError
+
+        return FinancePayment(
+            id=uuid4(),
+            tenant_id=tenant_id,
+            transaction_id=transaction_id,
+            created_by_user_id=created_by_user_id,
+            amount=amount,
+            paid_at=paid_at,
+            created_at=datetime.now(UTC),
         )

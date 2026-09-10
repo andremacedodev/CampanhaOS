@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { FinanceAttachmentSection } from "@/features/finance/components/FinanceAttachmentSection";
+import { FinancePaymentSection } from "@/features/finance/components/FinancePaymentSection";
 import { FinanceTransactionForm } from "@/features/finance/components/FinanceTransactionForm";
 import {
   useCreateFinanceTransaction,
@@ -27,7 +28,6 @@ export function FinanceTransactionFormPage() {
       amount: values.amount,
       occurred_at: values.occurred_at,
       description: values.description || null,
-      payment_status: values.payment_status,
     };
 
     if (isEditMode) {
@@ -55,6 +55,9 @@ export function FinanceTransactionFormPage() {
             isSubmitting={createTransaction.isPending || updateTransaction.isPending}
             submitLabel={isEditMode ? "Salvar alterações" : "Cadastrar lançamento"}
           />
+          {isEditMode && existingTransaction && (
+            <FinancePaymentSection transaction={existingTransaction} />
+          )}
           {isEditMode && existingTransaction && (
             <FinanceAttachmentSection transaction={existingTransaction} />
           )}

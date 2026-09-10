@@ -16,7 +16,7 @@ from src.domain.finance.repository import (
     FinanceSummary,
     FinanceTransactionListItem,
 )
-from src.infrastructure.database.models import FinanceAttachmentModel, FinanceTransactionModel
+from src.infrastructure.database.models import FinanceAttachmentModel, FinancePaymentModel, FinanceTransactionModel
 
 
 class SqlAlchemyFinanceRepository(FinanceRepository):
@@ -36,7 +36,6 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
                 description=transaction.description,
                 occurred_at=transaction.occurred_at,
                 deleted_at=transaction.deleted_at,
-                payment_status=transaction.payment_status,
             )
             self._session.add(model)
         else:
@@ -46,7 +45,6 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             existing.description = transaction.description
             existing.occurred_at = transaction.occurred_at
             existing.deleted_at = transaction.deleted_at
-            existing.payment_status = transaction.payment_status
 
         await self._session.flush()
 
@@ -71,8 +69,6 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             conditions.append(FinanceTransactionModel.occurred_at >= filters.occurred_after)
         if filters.occurred_before:
             conditions.append(FinanceTransactionModel.occurred_at <= filters.occurred_before)
-        if filters.payment_status:
-            conditions.append(FinanceTransactionModel.payment_status == filters.payment_status)
 
         return conditions
 
@@ -88,15 +84,30 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
         count_stmt = select(func.count()).select_from(FinanceTransactionModel).where(*conditions)
         total = (await self._session.execute(count_stmt)).scalar_one()
 
-        # LEFT JOIN + COUNT: uma query só traz a transação E quantos
-        # anexos ela tem, sem precisar de uma consulta extra por
-        # lançamento (evitaria N+1 se fosse um loop chamando
-        # count_by_transaction pra cada item da página).
+        # IMPORTANTE: subconsultas CORRELACIONADAS (uma pra cada
+        # agregação), não um JOIN duplo — se juntássemos
+        # finance_attachments E finance_payments num único JOIN, uma
+        # transação com 3 anexos e 2 pagamentos geraria 3×2=6 linhas
+        # ANTES do agrupamento, inflando as duas contagens (efeito
+        # "fan-out" — bug clássico de agregação com múltiplos JOINs
+        # um-para-muitos na mesma consulta). Subconsulta isolada por
+        # métrica evita esse problema por completo.
+        attachment_count_subq = (
+            select(func.count(FinanceAttachmentModel.id))
+            .where(FinanceAttachmentModel.transaction_id == FinanceTransactionModel.id)
+            .correlate(FinanceTransactionModel)
+            .scalar_subquery()
+        )
+        amount_paid_subq = (
+            select(func.coalesce(func.sum(FinancePaymentModel.amount), 0))
+            .where(FinancePaymentModel.transaction_id == FinanceTransactionModel.id)
+            .correlate(FinanceTransactionModel)
+            .scalar_subquery()
+        )
+
         list_stmt = (
-            select(FinanceTransactionModel, func.count(FinanceAttachmentModel.id))
-            .outerjoin(FinanceAttachmentModel, FinanceAttachmentModel.transaction_id == FinanceTransactionModel.id)
+            select(FinanceTransactionModel, attachment_count_subq, amount_paid_subq)
             .where(*conditions)
-            .group_by(FinanceTransactionModel.id)
             .order_by(FinanceTransactionModel.occurred_at.desc(), FinanceTransactionModel.id.asc())
             .offset((page - 1) * page_size)
             .limit(page_size)
@@ -105,8 +116,10 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
 
         return FinancePage(
             items=[
-                FinanceTransactionListItem(transaction=self._to_domain(model), attachment_count=count)
-                for model, count in rows
+                FinanceTransactionListItem(
+                    transaction=self._to_domain(model), attachment_count=attachment_count, amount_paid=amount_paid
+                )
+                for model, attachment_count, amount_paid in rows
             ],
             total=total,
             page=page,
@@ -125,10 +138,23 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
         rows = (await self._session.execute(stmt)).all()
         totals_by_type: dict[str, Decimal] = {row[0]: row[1] for row in rows}
 
+        # Total pago: soma de finance_payments cujas transações batem os
+        # MESMOS filtros da listagem — consulta separada (join simples,
+        # sem fan-out aqui porque não estamos agregando outra tabela
+        # junto na mesma consulta).
+        paid_stmt = (
+            select(func.coalesce(func.sum(FinancePaymentModel.amount), 0))
+            .select_from(FinancePaymentModel)
+            .join(FinanceTransactionModel, FinancePaymentModel.transaction_id == FinanceTransactionModel.id)
+            .where(*conditions)
+        )
+        total_pago = (await self._session.execute(paid_stmt)).scalar_one()
+
         return FinanceSummary(
             total_receitas=totals_by_type.get("receita", Decimal("0")),
             total_despesas=totals_by_type.get("despesa", Decimal("0")),
             total_doacoes=totals_by_type.get("doacao", Decimal("0")),
+            total_pago=total_pago,
         )
 
     def _to_domain(self, model: FinanceTransactionModel) -> FinanceTransaction:
@@ -144,6 +170,4 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             created_at=model.created_at,
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,
-            payment_status=model.payment_status,
         )
-

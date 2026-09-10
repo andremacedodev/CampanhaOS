@@ -1,16 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addFinanceAttachment,
+  addFinancePayment,
   createFinanceTransaction,
   deleteFinanceTransaction,
   getFinanceAttachmentDownloadUrl,
   getFinanceTransaction,
   listFinanceAttachments,
+  listFinancePayments,
   listFinanceTransactions,
   removeFinanceAttachment,
+  removeFinancePayment,
   updateFinanceTransaction,
 } from "@/features/finance/api/finance-api";
 import type {
+  FinancePaymentCreateRequest,
   FinanceTransactionCreateRequest,
   FinanceTransactionListParams,
   FinanceTransactionUpdateRequest,
@@ -102,5 +106,39 @@ export function useRemoveFinanceAttachment(transactionId: string) {
 export function useDownloadFinanceAttachment(transactionId: string) {
   return useMutation({
     mutationFn: (attachmentId: string) => getFinanceAttachmentDownloadUrl(transactionId, attachmentId),
+  });
+}
+
+const FINANCE_PAYMENTS_QUERY_KEY = "finance-payments";
+
+export function useFinancePayments(transactionId: string) {
+  return useQuery({
+    queryKey: [FINANCE_PAYMENTS_QUERY_KEY, transactionId],
+    queryFn: () => listFinancePayments(transactionId),
+  });
+}
+
+export function useAddFinancePayment(transactionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: FinancePaymentCreateRequest) => addFinancePayment(transactionId, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [FINANCE_PAYMENTS_QUERY_KEY, transactionId] });
+      // IMPORTANTE: também invalida o cache principal do lançamento —
+      // amount_paid/amount_remaining/effective_payment_status vêm
+      // JUNTO na consulta da transação, não só na de pagamentos.
+      void queryClient.invalidateQueries({ queryKey: [FINANCE_QUERY_KEY] });
+    },
+  });
+}
+
+export function useRemoveFinancePayment(transactionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => removeFinancePayment(transactionId, paymentId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [FINANCE_PAYMENTS_QUERY_KEY, transactionId] });
+      void queryClient.invalidateQueries({ queryKey: [FINANCE_QUERY_KEY] });
+    },
   });
 }

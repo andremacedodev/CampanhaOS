@@ -26,17 +26,12 @@ export const ATTACHMENT_CATEGORY_OPTIONS = [
 
 export const MAX_ATTACHMENTS_PER_TRANSACTION = 10;
 
-// Só 2 opções pra ESCOLHER — "atrasado" nunca é selecionado manualmente,
-// é sempre calculado pelo backend (pendente + data já passada).
-export const PAYMENT_STATUS_OPTIONS = [
-  { value: "pago", label: "Pago" },
-  { value: "pendente", label: "Pendente" },
-] as const;
-
-// Usa effective_payment_status (vem do backend já calculado) pra exibir
-// — nunca payment_status puro, senão "atrasado" nunca apareceria.
+// Usa effective_payment_status (vem do backend já calculado, nunca
+// escolhido manualmente) — pode ser null pra receita/doação (não têm
+// controle de pagamento nessa versão).
 export const PAYMENT_STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
   pago: { label: "Pago", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  parcial: { label: "Parcial", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
   pendente: { label: "Pendente", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
   atrasado: { label: "Atrasado", className: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
 };
@@ -51,8 +46,12 @@ export interface FinanceTransaction {
   occurred_at: string;
   created_at: string;
   updated_at: string;
-  payment_status: string;
-  effective_payment_status: string;
+  // null pra receita/doação — só despesa tem controle de pagamento.
+  effective_payment_status: string | null;
+  amount_paid: string;
+  // String porque é Decimal do backend — pode vir NEGATIVA se pagou
+  // mais que o lançado (permitido, sem bloqueio).
+  amount_remaining: string;
   attachment_count: number;
 }
 
@@ -75,11 +74,30 @@ export interface FinanceAttachmentDownloadResponse {
   filename: string;
 }
 
+export interface FinancePayment {
+  id: string;
+  transaction_id: string;
+  amount: string;
+  paid_at: string;
+  created_at: string;
+}
+
+export interface FinancePaymentListResponse {
+  items: FinancePayment[];
+}
+
+export interface FinancePaymentCreateRequest {
+  amount: string;
+  paid_at: string;
+}
+
 export interface FinanceSummary {
   total_receitas: string;
   total_despesas: string;
   total_doacoes: string;
-  saldo: string;
+  total_pago: string;
+  total_a_pagar: string;
+  saldo_atual: string;
 }
 
 export interface FinanceTransactionListResponse {
@@ -97,7 +115,6 @@ export interface FinanceTransactionFormValues {
   amount: string;
   occurred_at: string;
   description: string;
-  payment_status: string;
 }
 
 export interface FinanceTransactionCreateRequest {
@@ -106,7 +123,6 @@ export interface FinanceTransactionCreateRequest {
   amount: string;
   occurred_at: string;
   description?: string | null;
-  payment_status?: string;
 }
 
 export type FinanceTransactionUpdateRequest = Partial<FinanceTransactionCreateRequest>;
@@ -116,7 +132,6 @@ export interface FinanceTransactionListParams {
   category?: string;
   occurred_after?: string;
   occurred_before?: string;
-  payment_status?: string;
   page?: number;
   page_size?: number;
 }

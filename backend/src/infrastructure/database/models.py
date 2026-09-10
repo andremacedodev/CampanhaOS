@@ -273,7 +273,6 @@ class FinanceTransactionModel(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(String)
     occurred_at: Mapped[date] = mapped_column(Date, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pago")
 
 
 class FinanceAttachmentModel(Base):
@@ -417,3 +416,33 @@ class StickeredVehicleModel(TimestampMixin, Base):
     photo_filename: Mapped[str | None] = mapped_column(String(255))
     photo_content_type: Mapped[str | None] = mapped_column(String(100))
     photo_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class FinancePaymentModel(Base):
+    """
+    Um pagamento individual contra uma despesa — permite quitação
+    parcial em várias partes ao longo do tempo. Deliberadamente SEM
+    TimestampMixin — só tem `created_at` (quando foi registrado no
+    sistema), não `updated_at` (um pagamento não é editado, só criado ou
+    removido).
+    """
+
+    __tablename__ = "finance_payments"
+    __table_args__ = (
+        Index("ix_finance_payments_tenant_id", "tenant_id"),
+        Index("ix_finance_payments_transaction_id", "transaction_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("finance_transactions.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    paid_at: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
