@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Select } from "@/shared/components/ui/select";
@@ -40,6 +41,7 @@ function formatDate(iso: string): string {
 export function FinanceTransactionsListPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useFinanceTransactions({
     type: typeFilter || undefined,
@@ -134,6 +136,7 @@ export function FinanceTransactionsListPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"></TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Categoria</TableHead>
@@ -146,7 +149,7 @@ export function FinanceTransactionsListPage() {
             <TableBody>
               {data.items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     Nenhum lançamento encontrado.
                   </TableCell>
                 </TableRow>
@@ -155,38 +158,88 @@ export function FinanceTransactionsListPage() {
                 const statusDisplay = transaction.effective_payment_status
                   ? PAYMENT_STATUS_DISPLAY[transaction.effective_payment_status]
                   : null;
+                const isExpanded = expandedId === transaction.id;
+                // Só vale a pena expandir se tiver algo a mais pra
+                // mostrar — sem descrição e sem controle de pagamento
+                // (receita/doação), a linha expandida ficaria vazia.
+                const hasExtraInfo = Boolean(transaction.description) || transaction.type === "despesa";
+
                 return (
-                  <TableRow key={transaction.id}>
-                    <TableCell>{formatDate(transaction.occurred_at)}</TableCell>
-                    <TableCell className="capitalize">{transaction.type}</TableCell>
-                    <TableCell className="font-medium">{transaction.category}</TableCell>
-                    <TableCell className="text-right">{formatCurrencyFromString(transaction.amount)}</TableCell>
-                    <TableCell>
-                      {statusDisplay ? (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusDisplay.className}`}>
-                          {statusDisplay.label}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {transaction.attachment_count > 0 ? `📎 ${transaction.attachment_count}` : "—"}
-                    </TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/financeiro/${transaction.id}/editar`}>Editar</Link>
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(transaction.id, transaction.category)}
-                        disabled={deleteTransaction.isPending}
-                      >
-                        Excluir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  <Fragment key={transaction.id}>
+                    <TableRow
+                      onClick={() => hasExtraInfo && setExpandedId(isExpanded ? null : transaction.id)}
+                      className={hasExtraInfo ? "cursor-pointer hover:bg-accent/50" : undefined}
+                    >
+                      <TableCell>
+                        {hasExtraInfo &&
+                          (isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ))}
+                      </TableCell>
+                      <TableCell>{formatDate(transaction.occurred_at)}</TableCell>
+                      <TableCell className="capitalize">{transaction.type}</TableCell>
+                      <TableCell className="font-medium">{transaction.category}</TableCell>
+                      <TableCell className="text-right">{formatCurrencyFromString(transaction.amount)}</TableCell>
+                      <TableCell>
+                        {statusDisplay ? (
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusDisplay.className}`}>
+                            {statusDisplay.label}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {transaction.attachment_count > 0 ? `📎 ${transaction.attachment_count}` : "—"}
+                      </TableCell>
+                      <TableCell className="space-x-2 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/financeiro/${transaction.id}/editar`}>Editar</Link>
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(transaction.id, transaction.category)}
+                          disabled={deleteTransaction.isPending}
+                        >
+                          Excluir
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-muted/30 py-3">
+                          <div className="space-y-2 pl-8 text-sm">
+                            {transaction.description && (
+                              <p>
+                                <span className="font-medium text-muted-foreground">Descrição: </span>
+                                {transaction.description}
+                              </p>
+                            )}
+                            {transaction.type === "despesa" && (
+                              <p className="flex flex-wrap gap-x-4 text-muted-foreground">
+                                <span>
+                                  Pago: <span className="font-medium text-emerald-600">{formatCurrencyFromString(transaction.amount_paid)}</span>
+                                </span>
+                                <span>
+                                  {transaction.amount_remaining?.startsWith("-") ? "Pago a mais" : "Falta pagar"}:{" "}
+                                  <span className="font-medium">
+                                    {formatCurrencyFromString(
+                                      transaction.amount_remaining?.startsWith("-")
+                                        ? transaction.amount_remaining.slice(1)
+                                        : transaction.amount_remaining,
+                                    )}
+                                  </span>
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
                 );
               })}
             </TableBody>
