@@ -43,6 +43,7 @@ class ListFinanceTransactionsInput:
     tenant_id: UUID
     type: str | None = None
     category: str | None = None
+    search_text: str | None = None
     occurred_after: date | None = None
     occurred_before: date | None = None
     payment_status: str | None = None

@@ -130,6 +130,7 @@ export type FinanceTransactionUpdateRequest = Partial<FinanceTransactionCreateRe
 export interface FinanceTransactionListParams {
   type?: string;
   category?: string;
+  search?: string;
   occurred_after?: string;
   occurred_before?: string;
   payment_status?: string;

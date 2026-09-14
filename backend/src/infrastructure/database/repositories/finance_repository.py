@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.finance.entities import FinanceTransaction
@@ -66,6 +66,14 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             conditions.append(FinanceTransactionModel.type == filters.type)
         if filters.category:
             conditions.append(FinanceTransactionModel.category.ilike(f"%{filters.category}%"))
+        if filters.search_text:
+            like_pattern = f"%{filters.search_text}%"
+            conditions.append(
+                or_(
+                    FinanceTransactionModel.category.ilike(like_pattern),
+                    FinanceTransactionModel.description.ilike(like_pattern),
+                )
+            )
         if filters.occurred_after:
             conditions.append(FinanceTransactionModel.occurred_at >= filters.occurred_after)
         if filters.occurred_before:

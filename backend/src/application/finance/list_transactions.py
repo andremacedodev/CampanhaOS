@@ -16,6 +16,7 @@ class ListFinanceTransactionsUseCase:
         filters = FinanceFilter(
             type=input_data.type,
             category=input_data.category,
+            search_text=input_data.search_text,
             occurred_after=input_data.occurred_after,
             occurred_before=input_data.occurred_before,
             payment_status=input_data.payment_status,

@@ -97,6 +97,7 @@ async def list_transactions(
     use_case: Annotated[ListFinanceTransactionsUseCase, Depends(get_list_finance_transactions_use_case)],
     type: str | None = Query(None),  # nome mais natural pro cliente da API do que "type_"
     category: str | None = Query(None),
+    search: str | None = Query(None, description="Busca em categoria e descrição ao mesmo tempo"),
     occurred_after: date | None = Query(None),
     occurred_before: date | None = Query(None),
     payment_status: str | None = Query(
@@ -110,6 +111,7 @@ async def list_transactions(
             tenant_id=current_user.tenant_id,
             type=type,
             category=category,
+            search_text=search,
             occurred_after=occurred_after,
             occurred_before=occurred_before,
             payment_status=payment_status,

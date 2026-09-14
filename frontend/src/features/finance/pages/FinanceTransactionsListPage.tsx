@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import {
   Table,
@@ -39,12 +40,14 @@ function formatDate(iso: string): string {
 }
 
 export function FinanceTransactionsListPage() {
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useFinanceTransactions({
+    search: search || undefined,
     type: typeFilter || undefined,
     payment_status: statusFilter || undefined,
     page,
@@ -113,6 +116,16 @@ export function FinanceTransactionsListPage() {
           </Card>
         </div>
       )}
+
+      <Input
+        placeholder="Buscar por categoria ou descrição..."
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setPage(1);
+        }}
+        className="max-w-sm"
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <Select

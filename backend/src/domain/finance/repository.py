@@ -15,6 +15,10 @@ from src.domain.finance.entities import FinanceTransaction
 class FinanceFilter:
     type: str | None = None
     category: str | None = None
+    # Busca livre — olha categoria E descrição ao mesmo tempo (com OR),
+    # diferente de `category` acima (que filtra só por categoria). É o
+    # que alimenta a barra de pesquisa da tela.
+    search_text: str | None = None
     occurred_after: date | None = None
     occurred_before: date | None = None
     # Um de "pago"/"parcial"/"pendente"/"atrasado" — mesmo que
