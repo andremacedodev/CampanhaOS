@@ -45,6 +45,7 @@ class ListFinanceTransactionsInput:
     category: str | None = None
     occurred_after: date | None = None
     occurred_before: date | None = None
+    payment_status: str | None = None
     page: int = 1
     page_size: int = 20
 

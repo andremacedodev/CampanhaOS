@@ -17,6 +17,12 @@ class FinanceFilter:
     category: str | None = None
     occurred_after: date | None = None
     occurred_before: date | None = None
+    # Um de "pago"/"parcial"/"pendente"/"atrasado" — mesmo que
+    # `payment_status` não seja mais armazenado, dá pra FILTRAR por ele
+    # comparando a soma de pagamentos na consulta (ver implementação em
+    # SqlAlchemyFinanceRepository._build_conditions). Só se aplica a
+    # despesa — aplicar esse filtro já implica type="despesa" também.
+    payment_status: str | None = None
     include_deleted: bool = False
 
 

@@ -40,11 +40,13 @@ function formatDate(iso: string): string {
 
 export function FinanceTransactionsListPage() {
   const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useFinanceTransactions({
     type: typeFilter || undefined,
+    payment_status: statusFilter || undefined,
     page,
     page_size: PAGE_SIZE,
   });
@@ -112,21 +114,58 @@ export function FinanceTransactionsListPage() {
         </div>
       )}
 
-      <Select
-        value={typeFilter}
-        onChange={(e) => {
-          setTypeFilter(e.target.value);
-          setPage(1);
-        }}
-        className="max-w-xs"
-      >
-        <option value="">Todos os tipos</option>
-        {TRANSACTION_TYPE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Select
+          value={typeFilter}
+          onChange={(e) => {
+            const newType = e.target.value;
+            setTypeFilter(newType);
+            // Mesma proteção do caminho inverso: se um status estava
+            // ativo e o tipo mudou pra algo diferente de despesa, o
+            // status não faz mais sentido (só existe pra despesa).
+            if (statusFilter && newType !== "despesa") {
+              setStatusFilter("");
+            }
+            setPage(1);
+          }}
+          className="max-w-xs"
+        >
+          <option value="">Todos os tipos</option>
+          {TRANSACTION_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          value={statusFilter}
+          onChange={(e) => {
+            const newStatus = e.target.value;
+            setStatusFilter(newStatus);
+            // Status só existe pra despesa — escolher um status
+            // trava o tipo em "despesa" automaticamente, evitando a
+            // combinação contraditória "tipo=receita + status=pago"
+            // (que voltaria sempre vazia, sem essa proteção).
+            if (newStatus) {
+              setTypeFilter("despesa");
+            }
+            setPage(1);
+          }}
+          className="max-w-xs"
+        >
+          <option value="">Todos os status</option>
+          <option value="pago">Pago</option>
+          <option value="parcial">Parcial</option>
+          <option value="pendente">Pendente</option>
+          <option value="atrasado">Atrasado</option>
+        </Select>
+      </div>
+      {statusFilter && (
+        <p className="text-xs text-muted-foreground">
+          Esse filtro só se aplica a despesas — o tipo foi ajustado automaticamente.
+        </p>
+      )}
 
       {isLoading && <p className="text-muted-foreground">Carregando...</p>}
       {isError && <p className="text-destructive">Não foi possível carregar os lançamentos.</p>}

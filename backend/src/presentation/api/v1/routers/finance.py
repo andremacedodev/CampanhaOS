@@ -99,6 +99,9 @@ async def list_transactions(
     category: str | None = Query(None),
     occurred_after: date | None = Query(None),
     occurred_before: date | None = Query(None),
+    payment_status: str | None = Query(
+        None, description="Filtra despesas por 'pago', 'parcial', 'pendente' ou 'atrasado'"
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> FinanceTransactionListResponse:
@@ -109,6 +112,7 @@ async def list_transactions(
             category=category,
             occurred_after=occurred_after,
             occurred_before=occurred_before,
+            payment_status=payment_status,
             page=page,
             page_size=page_size,
         )

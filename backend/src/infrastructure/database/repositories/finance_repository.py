@@ -2,6 +2,7 @@
 Implementação concreta de FinanceRepository usando SQLAlchemy async.
 """
 
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -69,6 +70,47 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             conditions.append(FinanceTransactionModel.occurred_at >= filters.occurred_after)
         if filters.occurred_before:
             conditions.append(FinanceTransactionModel.occurred_at <= filters.occurred_before)
+        if filters.payment_status:
+            conditions.extend(self._payment_status_conditions(filters.payment_status))
+
+        return conditions
+
+    def _payment_status_conditions(self, payment_status: str) -> list[ColumnElement[bool]]:
+        """
+        Traduz um status CALCULADO (pago/parcial/pendente/atrasado) em
+        condições SQL, comparando a soma de pagamentos (subconsulta
+        correlacionada) contra o valor do lançamento — mesma lógica de
+        FinanceTransaction.compute_effective_status, só que expressa em
+        SQL em vez de Python, porque aqui precisa rodar no banco pra
+        filtrar antes de paginar (fazer isso em Python exigiria trazer
+        TODOS os lançamentos pra memória antes de filtrar, quebrando a
+        paginação).
+        """
+        amount_paid_subq = (
+            select(func.coalesce(func.sum(FinancePaymentModel.amount), 0))
+            .where(FinancePaymentModel.transaction_id == FinanceTransactionModel.id)
+            .correlate(FinanceTransactionModel)
+            .scalar_subquery()
+        )
+        today = date.today()
+
+        # Status só existe pra despesa — filtrar por qualquer um desses
+        # 4 valores já implica type="despesa" também (sem isso, receita/
+        # doação apareceriam erroneamente como "pendente", já que nunca
+        # têm pagamento registrado).
+        conditions: list[ColumnElement[bool]] = [FinanceTransactionModel.type == "despesa"]
+
+        if payment_status == "pago":
+            conditions.append(amount_paid_subq >= FinanceTransactionModel.amount)
+        elif payment_status == "parcial":
+            conditions.append(amount_paid_subq > 0)
+            conditions.append(amount_paid_subq < FinanceTransactionModel.amount)
+        elif payment_status == "pendente":
+            conditions.append(amount_paid_subq <= 0)
+            conditions.append(FinanceTransactionModel.occurred_at >= today)
+        elif payment_status == "atrasado":
+            conditions.append(amount_paid_subq <= 0)
+            conditions.append(FinanceTransactionModel.occurred_at < today)
 
         return conditions
 

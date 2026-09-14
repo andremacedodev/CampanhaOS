@@ -132,6 +132,7 @@ export interface FinanceTransactionListParams {
   category?: string;
   occurred_after?: string;
   occurred_before?: string;
+  payment_status?: string;
   page?: number;
   page_size?: number;
 }

@@ -18,6 +18,7 @@ class ListFinanceTransactionsUseCase:
             category=input_data.category,
             occurred_after=input_data.occurred_after,
             occurred_before=input_data.occurred_before,
+            payment_status=input_data.payment_status,
             include_deleted=False,
         )
 
