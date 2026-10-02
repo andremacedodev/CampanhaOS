@@ -63,7 +63,15 @@ class SqlAlchemyFinancePaymentRepository(FinancePaymentRepository):
     async def list_in_range_with_transaction_info(
         self, tenant_id: UUID, paid_after: date | None, paid_before: date | None
     ) -> list[PaymentWithTransactionInfo]:
-        conditions = [FinancePaymentModel.tenant_id == tenant_id]
+        # IMPORTANTE: filtra também pela despesa NÃO estar excluída —
+        # exclusão é "suave" (só marca `deleted_at`, não apaga os
+        # pagamentos que já existiam), então sem essa checagem os
+        # pagamentos de uma despesa excluída continuariam aparecendo no
+        # extrato pra sempre (bug real encontrado em produção).
+        conditions = [
+            FinancePaymentModel.tenant_id == tenant_id,
+            FinanceTransactionModel.deleted_at.is_(None),
+        ]
         if paid_after:
             conditions.append(FinancePaymentModel.paid_at >= paid_after)
         if paid_before:
