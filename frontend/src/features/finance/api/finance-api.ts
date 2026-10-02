@@ -92,3 +92,30 @@ export async function listFinancePayments(transactionId: string): Promise<Financ
 export async function removeFinancePayment(transactionId: string, paymentId: string): Promise<void> {
   await apiClient.delete(`/finance/${transactionId}/payments/${paymentId}`);
 }
+
+export async function downloadFinanceStatementExcel(params: {
+  occurred_after?: string;
+  occurred_before?: string;
+}): Promise<void> {
+  const response = await apiClient.get("/finance/statement/excel", {
+    params,
+    responseType: "blob",
+  });
+
+  // Fluxo padrão pra "forçar download" de um arquivo que já veio pronto
+  // na resposta: cria uma URL temporária só pro navegador, simula um
+  // clique num link invisível apontando pra ela, e descarta a URL
+  // logo em seguida (ela só existe na memória do navegador, não é um
+  // link de verdade pra lugar nenhum).
+  const blob = new Blob([response.data], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "extrato_financeiro.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}

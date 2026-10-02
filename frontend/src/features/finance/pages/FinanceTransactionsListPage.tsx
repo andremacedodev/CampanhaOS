@@ -5,6 +5,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
+import { FinanceStatementExport } from "@/features/finance/components/FinanceStatementExport";
 import {
   Table,
   TableBody,
@@ -79,6 +80,8 @@ export function FinanceTransactionsListPage() {
         Este módulo é controle financeiro interno da campanha. A prestação de contas oficial ao TSE continua
         sendo feita separadamente, pelo sistema Conta+JE.
       </p>
+
+      <FinanceStatementExport />
 
       {data && (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

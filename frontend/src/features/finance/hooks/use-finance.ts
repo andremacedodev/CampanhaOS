@@ -4,6 +4,7 @@ import {
   addFinancePayment,
   createFinanceTransaction,
   deleteFinanceTransaction,
+  downloadFinanceStatementExcel,
   getFinanceAttachmentDownloadUrl,
   getFinanceTransaction,
   listFinanceAttachments,
@@ -140,5 +141,12 @@ export function useRemoveFinancePayment(transactionId: string) {
       void queryClient.invalidateQueries({ queryKey: [FINANCE_PAYMENTS_QUERY_KEY, transactionId] });
       void queryClient.invalidateQueries({ queryKey: [FINANCE_QUERY_KEY] });
     },
+  });
+}
+
+export function useDownloadFinanceStatement() {
+  return useMutation({
+    mutationFn: (params: { occurred_after?: string; occurred_before?: string }) =>
+      downloadFinanceStatementExcel(params),
   });
 }
