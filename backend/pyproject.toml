@@ -57,6 +57,9 @@ dependencies = [
 
     # --- Armazenamento de arquivo (Cloudflare R2, compatível com S3) ---
     "boto3>=1.35.0",
+
+    # --- Geração de relatório Excel ---
+    "openpyxl>=3.1.0",
 ]
 
 [project.optional-dependencies]

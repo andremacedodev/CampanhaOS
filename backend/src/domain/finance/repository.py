@@ -90,6 +90,14 @@ class FinanceSummary:
         return self.total_receitas + self.total_doacoes - self.total_pago
 
 
+@dataclass(frozen=True)
+class PendingExpense:
+    """Uma despesa com saldo pendente (amount_paid < amount) — usado na seção "Pendências" do extrato."""
+
+    transaction: FinanceTransaction
+    amount_paid: Decimal
+
+
 class FinanceRepository(ABC):
     @abstractmethod
     async def save(self, transaction: FinanceTransaction) -> None:
@@ -117,3 +125,19 @@ class FinanceRepository(ABC):
         somando em Python, para não precisar carregar todos os registros
         na memória só para totalizar.
         """
+
+    @abstractmethod
+    async def list_receitas_and_doacoes(
+        self, tenant_id: UUID, occurred_after: date | None, occurred_before: date | None
+    ) -> list[FinanceTransaction]:
+        """
+        Receitas e doações no período, SEM paginação — usado pro extrato
+        (relatório), que precisa de todas as linhas de uma vez, não uma
+        página por vez.
+        """
+
+    @abstractmethod
+    async def list_pending_despesas(
+        self, tenant_id: UUID, occurred_after: date | None, occurred_before: date | None
+    ) -> list[PendingExpense]:
+        """Despesas lançadas no período cujo saldo pago ainda não cobre o valor total."""

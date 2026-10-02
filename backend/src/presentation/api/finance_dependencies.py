@@ -11,6 +11,7 @@ from src.application.finance.add_payment import AddFinancePaymentUseCase
 from src.application.finance.create_transaction import CreateFinanceTransactionUseCase
 from src.application.finance.delete_transaction import DeleteFinanceTransactionUseCase
 from src.application.finance.get_attachment_download_url import GetFinanceAttachmentDownloadUrlUseCase
+from src.application.finance.get_statement import GetFinanceStatementUseCase
 from src.application.finance.get_transaction import GetFinanceTransactionUseCase
 from src.application.finance.list_attachments import ListFinanceAttachmentsUseCase
 from src.application.finance.list_payments import ListFinancePaymentsUseCase
@@ -143,3 +144,10 @@ def get_remove_finance_payment_use_case(
     payment_repository: FinancePaymentRepositoryDep,
 ) -> RemoveFinancePaymentUseCase:
     return RemoveFinancePaymentUseCase(payment_repository)
+
+
+def get_finance_statement_use_case(
+    finance_repository: FinanceRepositoryDep,
+    payment_repository: FinancePaymentRepositoryDep,
+) -> GetFinanceStatementUseCase:
+    return GetFinanceStatementUseCase(finance_repository, payment_repository)

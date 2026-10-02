@@ -2,6 +2,7 @@
 Implementação concreta de FinancePaymentRepository usando SQLAlchemy async.
 """
 
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -9,8 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.finance.entities import FinancePayment
-from src.domain.finance.payment_repository import FinancePaymentRepository
-from src.infrastructure.database.models import FinancePaymentModel
+from src.domain.finance.payment_repository import FinancePaymentRepository, PaymentWithTransactionInfo
+from src.infrastructure.database.models import FinancePaymentModel, FinanceTransactionModel
 
 
 class SqlAlchemyFinancePaymentRepository(FinancePaymentRepository):
@@ -58,6 +59,27 @@ class SqlAlchemyFinancePaymentRepository(FinancePaymentRepository):
         if model is not None and model.tenant_id == tenant_id:
             await self._session.delete(model)
             await self._session.flush()
+
+    async def list_in_range_with_transaction_info(
+        self, tenant_id: UUID, paid_after: date | None, paid_before: date | None
+    ) -> list[PaymentWithTransactionInfo]:
+        conditions = [FinancePaymentModel.tenant_id == tenant_id]
+        if paid_after:
+            conditions.append(FinancePaymentModel.paid_at >= paid_after)
+        if paid_before:
+            conditions.append(FinancePaymentModel.paid_at <= paid_before)
+
+        stmt = (
+            select(FinancePaymentModel, FinanceTransactionModel.category, FinanceTransactionModel.description)
+            .join(FinanceTransactionModel, FinancePaymentModel.transaction_id == FinanceTransactionModel.id)
+            .where(*conditions)
+            .order_by(FinancePaymentModel.paid_at)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return [
+            PaymentWithTransactionInfo(payment=self._to_domain(payment_model), category=category, description=description)
+            for payment_model, category, description in rows
+        ]
 
     def _to_domain(self, model: FinancePaymentModel) -> FinancePayment:
         return FinancePayment(

@@ -142,6 +142,42 @@ class GetFinanceAttachmentDownloadUrlOutput:
 
 
 @dataclass(frozen=True)
+class GetFinanceStatementInput:
+    tenant_id: UUID
+    occurred_after: date | None = None
+    occurred_before: date | None = None
+
+
+@dataclass(frozen=True)
+class StatementLineOutput:
+    """Uma linha do extrato — um MOVIMENTO real de dinheiro (não um lançamento)."""
+
+    date: date
+    type: str
+    category: str
+    description: str | None
+    amount: Decimal  # já com sinal — negativo pra despesa, positivo pro resto
+    running_balance: Decimal
+
+
+@dataclass(frozen=True)
+class PendingExpenseOutput:
+    transaction_id: UUID
+    occurred_at: date
+    category: str
+    description: str | None
+    amount: Decimal
+    amount_paid: Decimal
+    amount_remaining: Decimal
+
+
+@dataclass(frozen=True)
+class FinanceStatementOutput:
+    lines: list[StatementLineOutput]
+    pending_expenses: list[PendingExpenseOutput]
+
+
+@dataclass(frozen=True)
 class AddFinancePaymentInput:
     tenant_id: UUID
     transaction_id: UUID

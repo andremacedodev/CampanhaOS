@@ -9,7 +9,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 
 from src.application.finance.add_attachment import AddFinanceAttachmentInput, AddFinanceAttachmentUseCase
 from src.application.finance.add_payment import AddFinancePaymentUseCase
@@ -19,6 +19,7 @@ from src.application.finance.dto import (
     AddFinancePaymentInput,
     CreateFinanceTransactionInput,
     DeleteFinanceTransactionInput,
+    GetFinanceStatementInput,
     GetFinanceTransactionInput,
     ListFinanceAttachmentsInput,
     ListFinancePaymentsInput,
@@ -30,6 +31,7 @@ from src.application.finance.get_attachment_download_url import (
     GetFinanceAttachmentDownloadUrlInput,
     GetFinanceAttachmentDownloadUrlUseCase,
 )
+from src.application.finance.get_statement import GetFinanceStatementUseCase
 from src.application.finance.get_transaction import GetFinanceTransactionUseCase
 from src.application.finance.list_attachments import ListFinanceAttachmentsUseCase
 from src.application.finance.list_payments import ListFinancePaymentsUseCase
@@ -37,6 +39,7 @@ from src.application.finance.list_transactions import ListFinanceTransactionsUse
 from src.application.finance.remove_attachment import RemoveFinanceAttachmentInput, RemoveFinanceAttachmentUseCase
 from src.application.finance.remove_payment import RemoveFinancePaymentUseCase
 from src.application.finance.update_transaction import UpdateFinanceTransactionUseCase
+from src.infrastructure.reports.finance_excel_report import generate_finance_statement_excel
 from src.presentation.api.dependencies import CurrentUser, DbSession
 from src.presentation.api.finance_dependencies import (
     get_add_finance_attachment_use_case,
@@ -44,6 +47,7 @@ from src.presentation.api.finance_dependencies import (
     get_create_finance_transaction_use_case,
     get_delete_finance_transaction_use_case,
     get_finance_attachment_download_url_use_case,
+    get_finance_statement_use_case,
     get_get_finance_transaction_use_case,
     get_list_finance_attachments_use_case,
     get_list_finance_payments_use_case,
@@ -120,6 +124,37 @@ async def list_transactions(
         )
     )
     return FinanceTransactionListResponse.model_validate(output)
+
+
+@router.get("/statement/excel")
+async def get_finance_statement_excel(
+    current_user: CurrentUser,
+    use_case: Annotated[GetFinanceStatementUseCase, Depends(get_finance_statement_use_case)],
+    occurred_after: date | None = Query(None),
+    occurred_before: date | None = Query(None),
+) -> Response:
+    """
+    Caminho com 2 segmentos (/statement/excel) — não conflita com
+    /{transaction_id} (1 segmento só), então a ordem de declaração não
+    importa aqui (diferente do caso de /map em voters.py).
+    """
+    statement = await use_case.execute(
+        GetFinanceStatementInput(
+            tenant_id=current_user.tenant_id, occurred_after=occurred_after, occurred_before=occurred_before
+        )
+    )
+    excel_bytes = generate_finance_statement_excel(statement)
+
+    period_suffix = ""
+    if occurred_after or occurred_before:
+        period_suffix = f"_{occurred_after or 'inicio'}_a_{occurred_before or 'hoje'}"
+    filename = f"extrato_financeiro{period_suffix}.xlsx"
+
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{transaction_id}", response_model=FinanceTransactionResponse)

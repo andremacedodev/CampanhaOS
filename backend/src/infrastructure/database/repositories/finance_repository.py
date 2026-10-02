@@ -16,6 +16,7 @@ from src.domain.finance.repository import (
     FinanceRepository,
     FinanceSummary,
     FinanceTransactionListItem,
+    PendingExpense,
 )
 from src.infrastructure.database.models import FinanceAttachmentModel, FinancePaymentModel, FinanceTransactionModel
 
@@ -206,6 +207,52 @@ class SqlAlchemyFinanceRepository(FinanceRepository):
             total_doacoes=totals_by_type.get("doacao", Decimal("0")),
             total_pago=total_pago,
         )
+
+    async def list_receitas_and_doacoes(
+        self, tenant_id: UUID, occurred_after: date | None, occurred_before: date | None
+    ) -> list[FinanceTransaction]:
+        conditions = [
+            FinanceTransactionModel.tenant_id == tenant_id,
+            FinanceTransactionModel.deleted_at.is_(None),
+            FinanceTransactionModel.type.in_(["receita", "doacao"]),
+        ]
+        if occurred_after:
+            conditions.append(FinanceTransactionModel.occurred_at >= occurred_after)
+        if occurred_before:
+            conditions.append(FinanceTransactionModel.occurred_at <= occurred_before)
+
+        stmt = select(FinanceTransactionModel).where(*conditions).order_by(FinanceTransactionModel.occurred_at)
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [self._to_domain(m) for m in models]
+
+    async def list_pending_despesas(
+        self, tenant_id: UUID, occurred_after: date | None, occurred_before: date | None
+    ) -> list[PendingExpense]:
+        amount_paid_subq = (
+            select(func.coalesce(func.sum(FinancePaymentModel.amount), 0))
+            .where(FinancePaymentModel.transaction_id == FinanceTransactionModel.id)
+            .correlate(FinanceTransactionModel)
+            .scalar_subquery()
+        )
+
+        conditions = [
+            FinanceTransactionModel.tenant_id == tenant_id,
+            FinanceTransactionModel.deleted_at.is_(None),
+            FinanceTransactionModel.type == "despesa",
+            amount_paid_subq < FinanceTransactionModel.amount,
+        ]
+        if occurred_after:
+            conditions.append(FinanceTransactionModel.occurred_at >= occurred_after)
+        if occurred_before:
+            conditions.append(FinanceTransactionModel.occurred_at <= occurred_before)
+
+        stmt = (
+            select(FinanceTransactionModel, amount_paid_subq)
+            .where(*conditions)
+            .order_by(FinanceTransactionModel.occurred_at)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return [PendingExpense(transaction=self._to_domain(model), amount_paid=paid) for model, paid in rows]
 
     def _to_domain(self, model: FinanceTransactionModel) -> FinanceTransaction:
         return FinanceTransaction(
